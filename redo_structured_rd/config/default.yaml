@@ -2,10 +2,10 @@ doc:
   dir_path: "data/raw_documents"
   glob: "*.txt"
 
-truncated_doc:
-  ntrials: 2
-  nsentences: [2, 3]
+# truncated_doc:
+#   ntrials: 2
+#   nsentences: [2, 3]
 
-translated_doc:
-  ntrials: 1
-  language: [fr, de]
+# translated_doc:
+#   ntrials: 1
+#   language: [fr, de]

@@ -32,14 +32,14 @@ class StepOutput:
 class FullDepsDict(DictConfig):
     def __init__(self, upstream_by_label: dict[str, StepOutput]):
         super().__init__(upstream_by_label)
-    
+
     def as_row(self) -> pd.Series:
         return pd.Series(list(self.values()), index=list(self.keys()))
-    
+
     @classmethod
     def from_row(cls, row: pd.Series) -> "FullDepsDict":
         return FullDepsDict(row.to_dict())
-    
+
     @classmethod
     def list_from_df(cls, df: pd.DataFrame) -> list["FullDepsDict"]:
         return [
@@ -58,7 +58,7 @@ class FullStepOutput:
         row0 = self.deps.as_row()
         row1 = pd.Series([self.output], index=[self.step_name])
         return pd.concat([row0, row1])
-    
+
     @classmethod
     def list_to_df(cls, the_list: list["FullStepOutput"]) -> pd.DataFrame:
         rows = [elem.as_row() for elem in the_list]
@@ -69,7 +69,7 @@ class Pipeline:
     def __init__(self):
         self._steps: dict[str, Callable[..., Iterable[StepOutput]]] = {}
         self._results: dict[str, list[FullStepOutput]] = {}
-    
+
     def run(self, config: DictConfig) -> None:
         for step_name in self._steps.keys():
             self._execute_step(step_name, config_full=config)
@@ -78,21 +78,21 @@ class Pipeline:
         def deco(fcn: Callable[..., Iterable[StepOutput]]):
             self._register_step(step_name, fcn)
         return deco
-    
+
     def save_results(self, dill_path: Path|None = None) -> None:
         if dill_path is None:
             dill_path = Path("./data/dill/all_results.dill")
         with open(dill_path, 'wb') as fdill:
             dill.dump(self._results, fdill)
-    
+
     def _register_step(self, step_name: str, fcn: Callable[..., Iterable[StepOutput]]) -> None:
         if step_name in self._steps:
             raise ValueError(f"Already registered step named {step_name}")
         self._steps[step_name] = fcn
-    
+
     def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
         return self._results[step_name]
-    
+
     def _sub_config_to_specs(self, sub_config: DictConfig) -> Iterable[DictConfig]:
         sub_config = OmegaConf.to_container(sub_config).copy()
         ntrials = sub_config.pop("ntrials", 1)
@@ -115,7 +115,7 @@ class Pipeline:
                 for key, val in zip(keys_tup, vals_tup, strict=True):
                     config_dict[key] = val
                 yield DictConfig(config_dict)
-    
+
     def _get_deps_dicts(self, deps_spec: list[str]|str|None) -> Iterable[FullDepsDict]:
         if not deps_spec:
             return [FullDepsDict({})]
@@ -132,7 +132,7 @@ class Pipeline:
                 df0 = df1
             else:
                 df0 = df0.join(df1, how="outer")
-        
+
         return FullDepsDict.list_from_df(df0)
 
         # the_prod = itertools.product(
@@ -140,7 +140,7 @@ class Pipeline:
         # )
         # for prod_tup in the_prod:
         #     yield FullDepsDict(dict(prod_tup))
-    
+
     def _execute_step(self, step_name: str, config_full: DictConfig) -> None:
         assert step_name not in self._results
         self._results[step_name] = []

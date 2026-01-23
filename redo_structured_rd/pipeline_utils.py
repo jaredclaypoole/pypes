@@ -13,6 +13,13 @@ def make_tuples(label: str, the_list: list[Any]) -> Iterable[tuple[str, Any]]:
         yield label, val
 
 
+def replace(obj: DictConfig, **kwargs) -> DictConfig:
+    obj = obj.copy()
+    for key, value in kwargs.items():
+        obj[key] = value
+    return obj
+
+
 @dataclass
 class StepOutput:
     spec: DictConfig

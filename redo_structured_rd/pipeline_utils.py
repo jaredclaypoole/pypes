@@ -19,12 +19,12 @@ class StepOutput:
     data: DictConfig
 
     def __lt__(self, other):
-        if not isinstance(other, "StepOutput"):
+        if not isinstance(other, StepOutput):
             return NotImplemented
         return self.spec < other.spec
 
     def __eq__(self, other):
-        if not isinstance(other, "StepOutput"):
+        if not isinstance(other, StepOutput):
             return NotImplemented
         return self.spec == other.spec
 
@@ -74,8 +74,11 @@ class Pipeline:
         for step_name in self._steps.keys():
             self._execute_step(step_name, config_full=config)
 
-    def auto_step(self, step_name: str):
+    def auto_step(self, step_name: str|None = None):
         def deco(fcn: Callable[..., Iterable[StepOutput]]):
+            nonlocal step_name
+            if step_name is None:
+                step_name = fcn.__name__
             self._register_step(step_name, fcn)
         return deco
 

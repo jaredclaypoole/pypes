@@ -175,10 +175,31 @@ pipeline = Pipeline()
 
 
 @pipeline.auto_step("doc")
-def load_document(spec: DictConfig) -> Iterable[StepOutput]:
+def load_document(spec: DictConfig, **kwargs) -> Iterable[StepOutput]:
     dir_path = Path(spec.dir_path)
     glob: str = spec.glob
     for fpath in sorted(dir_path.glob(glob)):
         text = fpath.read_text().strip()
-        data = DictConfig({"name": fpath.stem, "text": text})
-        yield StepOutput(spec=spec, data=data)
+        data = DictConfig(dict(text=text))
+        spec_new = replace(spec, path=fpath, name=fpath.stem)
+        yield StepOutput(spec=spec_new, data=data)
+
+
+@pipeline.auto_step()
+def truncated_doc(spec: DictConfig, doc: StepOutput, **kwargs) -> Iterable[StepOutput]:
+    nsentences: int = spec.nsentences
+    text: str = doc.data.text
+    sentences = text.split(".")[:nsentences]
+    sentences = [s.strip() for s in sentences] + [""]
+    new_text = ". ".join(sentences)[:-1]
+    data = DictConfig(dict(text=new_text))
+    yield StepOutput(spec=spec, data=data)
+
+
+@pipeline.auto_step()
+def translated_doc(spec: DictConfig, truncated_doc: StepOutput, **kwargs) -> Iterable[StepOutput]:
+    language: str = spec.language
+    text: str = truncated_doc.data.text
+    new_text = f"[language={language}] {text}"
+    data = DictConfig(dict(text=new_text))
+    yield StepOutput(spec=spec, data=data)

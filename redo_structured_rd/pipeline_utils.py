@@ -52,6 +52,7 @@ class FullDepsDict(DictConfig):
         ]
 
 
+
 @dataclass
 class FullStepOutput:
     deps: FullDepsDict
@@ -69,8 +70,11 @@ class FullStepOutput:
         return pd.DataFrame(rows)
 
 
+ResultsSpec = dict[str, list[FullStepOutput]]
+
+
 class DepsResolver:
-    def resolve_deps(self, deps_spec: list[str]|str|None) -> Iterable[FullDepsDict]:
+    def resolve_deps(self, deps_spec: list[str]|str|None, prev_results: ResultsSpec) -> Iterable[FullDepsDict]:
         if not deps_spec:
             return [FullDepsDict({})]
         if isinstance(deps_spec, str):
@@ -81,7 +85,7 @@ class DepsResolver:
         df0 = None
         while unprocessed_deps:
             dep = unprocessed_deps.pop()
-            df1 = FullStepOutput.list_to_df(self._results[dep])
+            df1 = FullStepOutput.list_to_df(prev_results[dep])
             if df0 is None:
                 df0 = df1
             else:
@@ -135,12 +139,10 @@ class StepSpec:
     output_type: type[StepOutputBase] = StepOutputBase
 
 
-
-
 class PipelineBase:
     def __init__(self):
         self._steps: dict[str, StepSpec] = {}
-        self._results: dict[str, list[FullStepOutput]] = {}
+        self._results: ResultsSpec = {}
 
     def run(self, config: DictConfig) -> None:
         for step_name in self._steps.keys():
@@ -176,12 +178,6 @@ class PipelineBase:
     def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
         return self._results[step_name]
 
-    # def _sub_config_to_specs(self, sub_config: DictConfig) -> Iterable[DictConfig]:
-        # myTODO
-
-    # def _get_deps_dicts(self, deps_spec: list[str]|str|None) -> Iterable[FullDepsDict]:
-    #     myTODO
-
     def _execute_step(self, step_name: str, config_full: DictConfig) -> None:
         step_spec = self._steps[step_name]
         assert step_name not in self._results
@@ -189,7 +185,7 @@ class PipelineBase:
         config: DictConfig = config_full[step_name]
         deps_spec = config.get("deps")
         for input in step_spec.config_resolver.resolve_sub_config(config):
-            for deps_dict in step_spec.deps_resolver.resolve_deps(deps_spec):
+            for deps_dict in step_spec.deps_resolver.resolve_deps(deps_spec, prev_results=self._results):
                 assert not "input" in deps_dict
                 step_outputs = list(step_spec.fcn(input=input, **deps_dict))
                 full_step_outputs = [

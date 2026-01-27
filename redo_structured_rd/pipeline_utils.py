@@ -1,7 +1,8 @@
 from pathlib import Path
 from dataclasses import dataclass, field
 import itertools
-from typing import Iterable, Callable, Any
+import collections.abc
+from typing import Iterable, Callable, Any, get_type_hints, get_origin, get_args
 
 from omegaconf import DictConfig, OmegaConf
 import pandas as pd
@@ -29,8 +30,6 @@ class StepInputBase:
 
 class StepOutputBase:
     pass
-
-
 
 
 class FullDepsDict(DictConfig):
@@ -156,9 +155,30 @@ class PipelineBase:
             nonlocal step_name
             if step_name is None:
                 step_name = fcn.__name__
+
+            hints = get_type_hints(fcn)
+            if next(iter(hints)) != "input":
+                raise TypeError(f"Expected the first argument of the decorated function to be named `input` and type annotated")
+            input_t = hints["input"]
+            for hint_name in hints:
+                pass
+            if hint_name != "return":
+                raise TypeError(f"Expected the return of the decorated function to be type annotated")
+
+            ret_t = hints["return"]
+            origin = get_origin(ret_t)
+            if origin is not collections.abc.Iterable:
+                raise TypeError("Return type of the decorated function must be Iterable[...].")
+            args = get_args(ret_t)
+            if len(args) != 1:
+                raise TypeError("Return type of the decorated function must be Iterable[T] with one type argument.")
+            output_t = args[0]
+
             step_spec = StepSpec(
                 name=step_name,
                 fcn=fcn,
+                input_type=input_t,
+                output_type=output_t,
                 **kwargs
             )
             self._register_step(step_name, step_spec)

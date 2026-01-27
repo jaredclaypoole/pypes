@@ -1,5 +1,5 @@
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import itertools
 from typing import Iterable, Callable, Any
 
@@ -20,24 +20,21 @@ def replace(obj: DictConfig, **kwargs) -> DictConfig:
     return obj
 
 
-@dataclass
-class StepOutput:
-    spec: DictConfig
-    data: DictConfig
+ConfigType = DictConfig
 
-    def __lt__(self, other):
-        if not isinstance(other, StepOutput):
-            return NotImplemented
-        return self.spec < other.spec
 
-    def __eq__(self, other):
-        if not isinstance(other, StepOutput):
-            return NotImplemented
-        return self.spec == other.spec
+class StepInputBase:
+    pass
+
+
+class StepOutputBase:
+    pass
+
+
 
 
 class FullDepsDict(DictConfig):
-    def __init__(self, upstream_by_label: dict[str, StepOutput]):
+    def __init__(self, upstream_by_label: dict[str, StepOutputBase]):
         super().__init__(upstream_by_label)
 
     def as_row(self) -> pd.Series:
@@ -58,7 +55,7 @@ class FullDepsDict(DictConfig):
 @dataclass
 class FullStepOutput:
     deps: FullDepsDict
-    output: StepOutput
+    output: StepOutputBase
     step_name: str
 
     def as_row(self) -> pd.Series:
@@ -72,61 +69,8 @@ class FullStepOutput:
         return pd.DataFrame(rows)
 
 
-class Pipeline:
-    def __init__(self):
-        self._steps: dict[str, Callable[..., Iterable[StepOutput]]] = {}
-        self._results: dict[str, list[FullStepOutput]] = {}
-
-    def run(self, config: DictConfig) -> None:
-        for step_name in self._steps.keys():
-            self._execute_step(step_name, config_full=config)
-
-    def auto_step(self, step_name: str|None = None):
-        def deco(fcn: Callable[..., Iterable[StepOutput]]):
-            nonlocal step_name
-            if step_name is None:
-                step_name = fcn.__name__
-            self._register_step(step_name, fcn)
-        return deco
-
-    def save_results(self, dill_path: Path|None = None) -> None:
-        if dill_path is None:
-            dill_path = Path("./data/dill/all_results.dill")
-        with open(dill_path, 'wb') as fdill:
-            dill.dump(self._results, fdill)
-
-    def _register_step(self, step_name: str, fcn: Callable[..., Iterable[StepOutput]]) -> None:
-        if step_name in self._steps:
-            raise ValueError(f"Already registered step named {step_name}")
-        self._steps[step_name] = fcn
-
-    def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
-        return self._results[step_name]
-
-    def _sub_config_to_specs(self, sub_config: DictConfig) -> Iterable[DictConfig]:
-        sub_config = OmegaConf.to_container(sub_config).copy()
-        ntrials = sub_config.pop("ntrials", 1)
-        config_dict0 = {}
-        scan_vals = {}
-        for key, value in sub_config.items():
-            if isinstance(value, list):
-                scan_vals[key] = value
-                config_dict0[key] = None
-            else:
-                config_dict0[key] = value
-
-        keys_tup = tuple(scan_vals.keys())
-        for vals_tup in itertools.product(*scan_vals.values()):
-            for trial in range(ntrials):
-                config_dict = {
-                    **dict(trial=trial),
-                    **config_dict0,
-                }
-                for key, val in zip(keys_tup, vals_tup, strict=True):
-                    config_dict[key] = val
-                yield DictConfig(config_dict)
-
-    def _get_deps_dicts(self, deps_spec: list[str]|str|None) -> Iterable[FullDepsDict]:
+class DepsResolver:
+    def resolve_deps(self, deps_spec: list[str]|str|None) -> Iterable[FullDepsDict]:
         if not deps_spec:
             return [FullDepsDict({})]
         if isinstance(deps_spec, str):
@@ -151,16 +95,103 @@ class Pipeline:
         # for prod_tup in the_prod:
         #     yield FullDepsDict(dict(prod_tup))
 
+
+class ConfigResolver:
+    def resolve_full_config(self, step_name: str, full_config: DictConfig) -> Iterable[StepInputBase]:
+        sub_config = full_config[step_name]
+        yield from self.resolve_sub_config(sub_config)
+
+    def resolve_sub_config(self, sub_config: DictConfig) -> Iterable[StepInputBase]:
+        sub_config = OmegaConf.to_container(sub_config).copy()
+        ntrials = sub_config.pop("ntrials", 1)
+        config_dict0 = {}
+        scan_vals = {}
+        for key, value in sub_config.items():
+            if isinstance(value, list):
+                scan_vals[key] = value
+                config_dict0[key] = None
+            else:
+                config_dict0[key] = value
+
+        keys_tup = tuple(scan_vals.keys())
+        for vals_tup in itertools.product(*scan_vals.values()):
+            for trial in range(ntrials):
+                config_dict = {
+                    **dict(trial=trial),
+                    **config_dict0,
+                }
+                for key, val in zip(keys_tup, vals_tup, strict=True):
+                    config_dict[key] = val
+                yield DictConfig(config_dict)
+
+
+@dataclass
+class StepSpec:
+    name: str
+    fcn: Callable[..., Iterable[StepOutputBase]]
+    deps_resolver: DepsResolver = field(default_factory=DepsResolver)
+    config_resolver: ConfigResolver = field(default_factory=ConfigResolver)
+    input_type: type[StepInputBase] = StepInputBase
+    output_type: type[StepOutputBase] = StepOutputBase
+
+
+
+
+class PipelineBase:
+    def __init__(self):
+        self._steps: dict[str, StepSpec] = {}
+        self._results: dict[str, list[FullStepOutput]] = {}
+
+    def run(self, config: DictConfig) -> None:
+        for step_name in self._steps.keys():
+            self._execute_step(step_name, config_full=config)
+
+    def step(self, step_name: str|None = None, **kwargs):
+        """
+        Decorator to add a step to the pipeline
+        """
+        def deco(fcn: Callable[..., Iterable[StepOutputBase]]):
+            nonlocal step_name
+            if step_name is None:
+                step_name = fcn.__name__
+            step_spec = StepSpec(
+                name=step_name,
+                fcn=fcn,
+                **kwargs
+            )
+            self._register_step(step_name, step_spec)
+        return deco
+
+    def save_results(self, dill_path: Path|None = None) -> None:
+        if dill_path is None:
+            dill_path = Path("./data/dill/all_results.dill")
+        with open(dill_path, 'wb') as fdill:
+            dill.dump(self._results, fdill)
+
+    def _register_step(self, step_name: str, step_spec: StepSpec) -> None:
+        if step_name in self._steps:
+            raise ValueError(f"Already registered step named {step_name}")
+        self._steps[step_name] = step_spec
+
+    def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
+        return self._results[step_name]
+
+    # def _sub_config_to_specs(self, sub_config: DictConfig) -> Iterable[DictConfig]:
+        # myTODO
+
+    # def _get_deps_dicts(self, deps_spec: list[str]|str|None) -> Iterable[FullDepsDict]:
+    #     myTODO
+
     def _execute_step(self, step_name: str, config_full: DictConfig) -> None:
+        step_spec = self._steps[step_name]
         assert step_name not in self._results
         self._results[step_name] = []
-        step_fcn = self._steps[step_name]
         config: DictConfig = config_full[step_name]
         deps_spec = config.get("deps")
-        for spec in self._sub_config_to_specs(config):
-            for deps_dict in self._get_deps_dicts(deps_spec):
-                assert not "spec" in deps_dict
-                step_outputs = list(step_fcn(spec=spec, **deps_dict))
+        for input in step_spec.config_resolver.resolve_sub_config(config):
+            for deps_dict in step_spec.deps_resolver.resolve_deps(deps_spec):
+                assert not "input" in deps_dict
+                step_outputs = list(step_spec.fcn(input=input, **deps_dict))
                 full_step_outputs = [
                     FullStepOutput(
                         deps=deps_dict,
@@ -171,35 +202,53 @@ class Pipeline:
                 ]
                 self._results[step_name].extend(full_step_outputs)
 
+
+class StepInput(DictConfig, StepInputBase):
+    pass
+
+class StepData(DictConfig):
+    pass
+
+
+@dataclass
+class CompoundStepOutput(StepOutputBase):
+    input: StepInputBase
+    data: StepData
+
+
+class Pipeline(PipelineBase):
+    pass
+
+
 pipeline = Pipeline()
 
 
-@pipeline.auto_step("doc")
-def load_document(spec: DictConfig, **kwargs) -> Iterable[StepOutput]:
-    dir_path = Path(spec.dir_path)
-    glob: str = spec.glob
+@pipeline.step("doc")
+def load_document(input: StepInput, **kwargs) -> Iterable[CompoundStepOutput]:
+    dir_path = Path(input.dir_path)
+    glob: str = input.glob
     for fpath in sorted(dir_path.glob(glob)):
         text = fpath.read_text().strip()
-        data = DictConfig(dict(text=text))
-        spec_new = replace(spec, path=fpath, name=fpath.stem)
-        yield StepOutput(spec=spec_new, data=data)
+        data = StepData(dict(text=text))
+        input_mod = replace(input, path=fpath, name=fpath.stem)
+        yield CompoundStepOutput(input=input_mod, data=data)
 
 
-@pipeline.auto_step()
-def truncated_doc(spec: DictConfig, doc: StepOutput, **kwargs) -> Iterable[StepOutput]:
-    nsentences: int = spec.nsentences
+@pipeline.step()
+def truncated_doc(input: StepInput, doc: CompoundStepOutput, **kwargs) -> Iterable[CompoundStepOutput]:
+    nsentences: int = input.nsentences
     text: str = doc.data.text
     sentences = text.split(".")[:nsentences]
     sentences = [s.strip() for s in sentences] + [""]
     new_text = ". ".join(sentences)[:-1]
-    data = DictConfig(dict(text=new_text))
-    yield StepOutput(spec=spec, data=data)
+    data = StepData(dict(text=new_text))
+    yield CompoundStepOutput(input=input, data=data)
 
 
-@pipeline.auto_step()
-def translated_doc(spec: DictConfig, truncated_doc: StepOutput, **kwargs) -> Iterable[StepOutput]:
-    language: str = spec.language
+@pipeline.step()
+def translated_doc(input: StepInput, truncated_doc: CompoundStepOutput, **kwargs) -> Iterable[CompoundStepOutput]:
+    language: str = input.language
     text: str = truncated_doc.data.text
     new_text = f"[language={language}] {text}"
-    data = DictConfig(dict(text=new_text))
-    yield StepOutput(spec=spec, data=data)
+    data = StepData(dict(text=new_text))
+    yield CompoundStepOutput(input=input, data=data)

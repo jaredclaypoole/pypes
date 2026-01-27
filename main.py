@@ -1,10 +1,10 @@
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from redo_structured_rd.pipeline_utils import pipeline
+from examples.main.compound_dict_config_pipeline import pipeline
 
 
-@hydra.main(version_base=None, config_path="redo_structured_rd/config", config_name="default")
+@hydra.main(version_base=None, config_path="examples/main/config", config_name="default")
 def main(config: DictConfig) -> None:
     print("Full config:")
     print(OmegaConf.to_yaml(config))

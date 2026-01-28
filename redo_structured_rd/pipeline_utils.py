@@ -22,6 +22,14 @@ def replace(obj: DictConfig, **kwargs) -> DictConfig:
 
 
 ConfigType = DictConfig
+SubConfigType = DictConfig
+
+
+def sub_config_to_dict(sub_config: SubConfigType) -> dict:
+    if isinstance(sub_config, DictConfig):
+        return OmegaConf.to_container(sub_config)
+    else:
+        raise NotImplementedError(type(sub_config))
 
 
 class StepInputBase:
@@ -51,7 +59,6 @@ class FullDepsDict(DictConfig):
         ]
 
 
-
 @dataclass
 class FullStepOutput:
     deps: FullDepsDict
@@ -73,6 +80,9 @@ ResultsSpec = dict[str, list[FullStepOutput]]
 
 
 class DepsResolver:
+    def post_init(self, step_spec: "StepSpec") -> None:
+        self.step_spec = step_spec
+
     def resolve_deps(self, deps_spec: list[str]|str|None, prev_results: ResultsSpec) -> Iterable[FullDepsDict]:
         if not deps_spec:
             return [FullDepsDict({})]
@@ -100,12 +110,17 @@ class DepsResolver:
 
 
 class ConfigResolver:
-    def resolve_full_config(self, step_name: str, full_config: DictConfig) -> Iterable[StepInputBase]:
-        sub_config = full_config[step_name]
-        yield from self.resolve_sub_config(sub_config)
+    def post_init(self, step_spec: "StepSpec") -> None:
+        self.step_spec = step_spec
 
-    def resolve_sub_config(self, sub_config: DictConfig) -> Iterable[StepInputBase]:
-        sub_config = OmegaConf.to_container(sub_config).copy()
+    def get_sub_config(self, full_config: ConfigType) -> SubConfigType:
+        step_name = self.step_spec.name
+        sub_config = full_config[step_name]
+        return sub_config
+
+    def resolve_sub_config(self, sub_config: SubConfigType) -> Iterable[StepInputBase]:
+        input_type = self.step_spec.input_type
+        sub_config = sub_config_to_dict(sub_config).copy()
         ntrials = sub_config.pop("ntrials", 1)
         config_dict0 = {}
         scan_vals = {}
@@ -125,7 +140,7 @@ class ConfigResolver:
                 }
                 for key, val in zip(keys_tup, vals_tup, strict=True):
                     config_dict[key] = val
-                yield DictConfig(config_dict)
+                yield input_type(config_dict)
 
 
 @dataclass
@@ -136,6 +151,10 @@ class StepSpec:
     config_resolver: ConfigResolver = field(default_factory=ConfigResolver)
     input_type: type[StepInputBase] = StepInputBase
     output_type: type[StepOutputBase] = StepOutputBase
+
+    def __post_init__(self) -> None:
+        self.deps_resolver.post_init(self)
+        self.config_resolver.post_init(self)
 
 
 class PipelineBase:

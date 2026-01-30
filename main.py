@@ -3,7 +3,8 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from examples.main.compound_dict_config_pipeline import pipeline
+# from examples.main.compound_dict_config_pipeline import pipeline
+from examples.main.pydantic_pipeline import pipeline
 
 
 @hydra.main(version_base=None, config_path="examples/main/config", config_name="default")

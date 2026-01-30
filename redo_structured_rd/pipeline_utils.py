@@ -40,7 +40,7 @@ class StepOutputBase:
     pass
 
 
-class FullDepsDict(DictConfig):
+class FullDepsDict(dict):
     def __init__(self, upstream_by_label: dict[str, StepOutputBase]):
         super().__init__(upstream_by_label)
 
@@ -49,7 +49,7 @@ class FullDepsDict(DictConfig):
 
     @classmethod
     def from_row(cls, row: pd.Series) -> "FullDepsDict":
-        return FullDepsDict(row.to_dict())
+        return cls(row.to_dict())
 
     @classmethod
     def list_from_df(cls, df: pd.DataFrame) -> list["FullDepsDict"]:

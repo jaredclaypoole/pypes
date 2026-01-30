@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
@@ -11,7 +13,16 @@ def main(config: DictConfig) -> None:
     print()
 
     pipeline.run(config)
-    pipeline.save_results()
+    dill_path = Path("./data/dill/all_results.dill")
+    pipeline.save_results(dill_path=dill_path)
+    print(f"Results saved to {dill_path}")
+
+    import dill
+    with open(dill_path, 'rb') as fdill:
+        results = dill.load(fdill)
+
+    breakpoint()
+    print("Done")
 
 
 if __name__ == '__main__':

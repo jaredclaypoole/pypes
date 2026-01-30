@@ -140,7 +140,10 @@ class ConfigResolver:
                 }
                 for key, val in zip(keys_tup, vals_tup, strict=True):
                     config_dict[key] = val
-                yield input_type(config_dict)
+                if issubclass(input_type, DictConfig):
+                    yield input_type(config_dict)
+                else:
+                    yield input_type(**config_dict)
 
 
 @dataclass

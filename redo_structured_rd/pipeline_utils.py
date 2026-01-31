@@ -64,7 +64,11 @@ class FullDepsDict(dict):
             for name, full_step_output in self.items()
         }
 
-@dataclass
+    def __hash__(self):
+        return object.__hash__(self)
+
+
+@dataclass(frozen=True)
 class FullStepOutput:
     deps: FullDepsDict
     output: StepOutputBase

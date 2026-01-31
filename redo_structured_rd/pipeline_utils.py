@@ -68,7 +68,7 @@ class FullDepsDict(dict):
         return object.__hash__(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class FullStepOutput:
     deps: FullDepsDict
     output: StepOutputBase

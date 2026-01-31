@@ -10,7 +10,7 @@ from redo_structured_rd.pipeline_utils import (
 )
 
 def get_fields_dict(model: BaseModel) -> dict[str, Any]:
-    return {name: getattr(model, name) for name in model.model_fields}
+    return {name: getattr(model, name) for name in type(model).model_fields}
 
 
 class Pipeline(PipelineBase):

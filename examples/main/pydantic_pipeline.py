@@ -20,7 +20,7 @@ class Pipeline(PipelineBase):
 pipeline = Pipeline()
 
 
-class StepInput(BaseModel):
+class StepInput(BaseModel, frozen=True):
     trial: int
 
 

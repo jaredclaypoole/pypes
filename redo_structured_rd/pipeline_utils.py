@@ -41,7 +41,7 @@ class StepOutputBase:
 
 
 class FullDepsDict(dict):
-    def __init__(self, upstream_by_label: dict[str, StepOutputBase]):
+    def __init__(self, upstream_by_label: dict[str, "FullStepOutput"]):
         super().__init__(upstream_by_label)
 
     def as_row(self) -> pd.Series:
@@ -58,6 +58,11 @@ class FullDepsDict(dict):
             for _idx, row in df.iterrows()
         ]
 
+    def to_simple_dict(self) -> dict[str, StepOutputBase]:
+        return {
+            name: full_step_output.output
+            for name, full_step_output in self.items()
+        }
 
 @dataclass
 class FullStepOutput:
@@ -65,9 +70,10 @@ class FullStepOutput:
     output: StepOutputBase
     step_name: str
 
-    def as_row(self) -> pd.Series:
+    def as_row(self, full_output: bool = True) -> pd.Series:
+        output = self if full_output else self.output
         row0 = self.deps.as_row()
-        row1 = pd.Series([self.output], index=[self.step_name])
+        row1 = pd.Series([output], index=[self.step_name])
         return pd.concat([row0, row1])
 
     @classmethod
@@ -227,12 +233,13 @@ class PipelineBase:
         config: DictConfig = config_full[step_name]
         deps_spec = config.get("deps")
         for input in step_spec.config_resolver.resolve_sub_config(config):
-            for deps_dict in step_spec.deps_resolver.resolve_deps(deps_spec, prev_results=self._results):
+            for full_deps_dict in step_spec.deps_resolver.resolve_deps(deps_spec, prev_results=self._results):
+                deps_dict = full_deps_dict.to_simple_dict()
                 assert not "input" in deps_dict
                 step_outputs = list(step_spec.fcn(input=input, **deps_dict))
                 full_step_outputs = [
                     FullStepOutput(
-                        deps=deps_dict,
+                        deps=full_deps_dict,
                         output=output,
                         step_name=step_name,
                     )

@@ -39,6 +39,9 @@ class StepInputBase:
 class StepOutputBase:
     pass
 
+DepsType = StepOutputBase
+DepsSpecType = list[str]|str|None
+
 
 class FullDepsDict(dict):
     def __init__(self, upstream_by_label: dict[str, "FullStepOutput"]):
@@ -90,10 +93,7 @@ ResultsSpec = dict[str, list[FullStepOutput]]
 
 
 class DepsResolver:
-    def post_init(self, step_spec: "StepSpec") -> None:
-        self.step_spec = step_spec
-
-    def resolve_deps(self, deps_spec: list[str]|str|None, prev_results: ResultsSpec) -> Iterable[FullDepsDict]:
+    def resolve_deps(self, deps_spec: DepsSpecType, prev_results: ResultsSpec) -> Iterable[FullDepsDict]:
         if not deps_spec:
             return [FullDepsDict({})]
         if isinstance(deps_spec, str):
@@ -112,24 +112,19 @@ class DepsResolver:
 
         return FullDepsDict.list_from_df(df0)
 
-        # the_prod = itertools.product(
-        #     *[make_tuples(dep, self.get_instances(dep)) for dep in deps_spec]
-        # )
-        # for prod_tup in the_prod:
-        #     yield FullDepsDict(dict(prod_tup))
-
 
 class ConfigResolver:
-    def post_init(self, step_spec: "StepSpec") -> None:
-        self.step_spec = step_spec
+    def __init__(self, step: "PipelineStepBase"):
+        super().__init__()
+        self.step = step
 
     def get_sub_config(self, full_config: ConfigType) -> SubConfigType:
-        step_name = self.step_spec.name
+        step_name = self.step.step_name
         sub_config = full_config[step_name]
         return sub_config
 
     def resolve_sub_config(self, sub_config: SubConfigType) -> Iterable[StepInputBase]:
-        input_type = self.step_spec.input_type
+        proto_input_type = self.step.proto_input_type
         sub_config = sub_config_to_dict(sub_config).copy()
         ntrials = sub_config.pop("ntrials", 1)
         config_dict0 = {}
@@ -150,71 +145,89 @@ class ConfigResolver:
                 }
                 for key, val in zip(keys_tup, vals_tup, strict=True):
                     config_dict[key] = val
-                if issubclass(input_type, DictConfig):
-                    yield input_type(config_dict)
+                if issubclass(proto_input_type, DictConfig):
+                    yield proto_input_type(config_dict)
                 else:
-                    yield input_type(**config_dict)
+                    yield proto_input_type(**config_dict)
 
 
-@dataclass
-class StepSpec:
-    name: str
-    fcn: Callable[..., Iterable[StepOutputBase]]
-    deps_resolver: DepsResolver = field(default_factory=DepsResolver)
-    config_resolver: ConfigResolver = field(default_factory=ConfigResolver)
-    input_type: type[StepInputBase] = StepInputBase
-    output_type: type[StepOutputBase] = StepOutputBase
 
-    def __post_init__(self) -> None:
-        self.deps_resolver.post_init(self)
-        self.config_resolver.post_init(self)
+class PipelineInterface:
+    @property
+    def results(self) -> ResultsSpec:
+        raise NotImplementedError()
 
 
-class PipelineBase:
+class PipelineStepInterface:
+    @property
+    def step_name(self) -> str:
+        raise NotImplementedError()
+
+    def resolve_deps(self, pipeline: PipelineInterface) -> Iterable[FullDepsDict]:
+        raise NotImplementedError()
+
+    def unpack_deps(self, full_deps_dict: FullDepsDict) -> dict[str, DepsType]:
+        raise NotImplementedError()
+
+    def config_to_inputs(self, config: ConfigType) -> Iterable[StepInputBase]:
+        raise NotImplementedError()
+
+    def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
+        raise NotImplementedError()
+
+
+class PipelineStepBase(PipelineStepInterface):
+    def __init__(
+        self,
+        step_name: str,
+        deps_spec: list[str]|str|None,
+        proto_input_type: type[StepInputBase]|None = None,
+        input_type: type[StepInputBase] = StepInputBase,
+        output_type: type[StepOutputBase] = StepOutputBase,
+    ):
+        super().__init__()
+        self._step_name = step_name
+        self.deps_spec = deps_spec
+        self.proto_input_type = proto_input_type or input_type
+        self.input_type = input_type
+        self.output_type = output_type
+
+        self._deps_resolver = DepsResolver()
+        self._config_resolver = ConfigResolver(self)
+
+    @property
+    def step_name(self) -> str:
+        return self._step_name
+
+    def resolve_deps(self, pipeline: PipelineInterface) -> Iterable[FullDepsDict]:
+        yield from self._deps_resolver.resolve_deps(self.deps_spec, pipeline.results)
+
+    def unpack_deps(self, full_deps_dict: FullDepsDict) -> dict[str, DepsType]:
+        deps_dict = {
+            name: full_step_output.output
+            for name, full_step_output in full_deps_dict.items()
+        }
+        return deps_dict
+
+    def config_to_inputs(self, config: ConfigType) -> Iterable[StepInputBase]:
+        yield from self._config_resolver.resolve_sub_config(config)
+
+    def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
+        raise NotImplementedError()
+
+
+class PipelineBase(PipelineInterface):
     def __init__(self):
-        self._steps: dict[str, StepSpec] = {}
+        self._steps: dict[str, PipelineStepInterface] = {}
         self._results: ResultsSpec = {}
+
+    @property
+    def results(self) -> ResultsSpec:
+        return self._results
 
     def run(self, config: DictConfig) -> None:
         for step_name in self._steps.keys():
             self._execute_step(step_name, config_full=config)
-
-    def step(self, step_name: str|None = None, **kwargs):
-        """
-        Decorator to add a step to the pipeline
-        """
-        def deco(fcn: Callable[..., Iterable[StepOutputBase]]):
-            nonlocal step_name
-            if step_name is None:
-                step_name = fcn.__name__
-
-            hints = get_type_hints(fcn)
-            if next(iter(hints)) != "input":
-                raise TypeError(f"Expected the first argument of the decorated function to be named `input` and type annotated")
-            input_t = hints["input"]
-            for hint_name in hints:
-                pass
-            if hint_name != "return":
-                raise TypeError(f"Expected the return of the decorated function to be type annotated")
-
-            ret_t = hints["return"]
-            origin = get_origin(ret_t)
-            if origin is not collections.abc.Iterable:
-                raise TypeError("Return type of the decorated function must be Iterable[...].")
-            args = get_args(ret_t)
-            if len(args) != 1:
-                raise TypeError("Return type of the decorated function must be Iterable[T] with one type argument.")
-            output_t = args[0]
-
-            step_spec = StepSpec(
-                name=step_name,
-                fcn=fcn,
-                input_type=input_t,
-                output_type=output_t,
-                **kwargs
-            )
-            self._register_step(step_name, step_spec)
-        return deco
 
     def save_results(self, dill_path: Path|None = None) -> None:
         if dill_path is None:
@@ -222,31 +235,32 @@ class PipelineBase:
         with open(dill_path, 'wb') as fdill:
             dill.dump(self._results, fdill)
 
-    def _register_step(self, step_name: str, step_spec: StepSpec) -> None:
+    def add_steps(self, steps: Iterable[PipelineStepInterface]) -> None:
+        for step in steps:
+            self.add_step(step)
+
+    def add_step(self, step: PipelineStepInterface) -> None:
+        step_name = step.step_name
         if step_name in self._steps:
             raise ValueError(f"Already registered step named {step_name}")
-        self._steps[step_name] = step_spec
+        self._steps[step_name] = step
 
     def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
         return self._results[step_name]
 
     def _execute_step(self, step_name: str, config_full: DictConfig) -> None:
-        step_spec = self._steps[step_name]
+        step = self._steps[step_name]
         assert step_name not in self._results
         self._results[step_name] = []
         config: DictConfig = config_full[step_name]
-        deps_spec = config.get("deps")
-        for input in step_spec.config_resolver.resolve_sub_config(config):
-            for full_deps_dict in step_spec.deps_resolver.resolve_deps(deps_spec, prev_results=self._results):
+        for input in step.config_to_inputs(config):
+            for full_deps_dict in step.resolve_deps(pipeline=self):
                 deps_dict = full_deps_dict.to_simple_dict()
                 assert not "input" in deps_dict
-                step_outputs = list(step_spec.fcn(input=input, **deps_dict))
-                full_step_outputs = [
-                    FullStepOutput(
-                        deps=full_deps_dict,
-                        output=output,
-                        step_name=step_name,
-                    )
-                    for output in step_outputs
-                ]
-                self._results[step_name].extend(full_step_outputs)
+                step_output = step.input_to_output(input=input, **deps_dict)
+                full_step_output = FullStepOutput(
+                    deps=full_deps_dict,
+                    output=step_output,
+                    step_name=step_name,
+                )
+                self._results[step_name].append(full_step_output)

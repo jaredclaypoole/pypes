@@ -4,9 +4,11 @@ from typing import Iterable, Any
 from pydantic import BaseModel
 
 from redo_structured_rd.pipeline_utils import (
+    PipelineStepBase,
     PipelineBase,
     StepInputBase,
     StepOutputBase,
+    ConfigType,
 )
 
 def get_fields_dict(model: BaseModel) -> dict[str, Any]:
@@ -24,28 +26,46 @@ class StepInput(BaseModel, frozen=True):
     trial: int
 
 
-class DocInput(StepInput):
+class DocProtoInput(StepInput):
     dir_path: str
     glob: str
 
-class DocOutput(DocInput):
+class DocInput(DocProtoInput):
     path: str
     name: str
+
+class DocOutput(DocInput):
     text: str
 
-@pipeline.step("doc")
-def load_document(input: DocInput, **kwargs) -> Iterable[DocOutput]:
-    dir_path = Path(input.dir_path)
-    glob: str = input.glob
-    for fpath in sorted(dir_path.glob(glob)):
+class DocStep(PipelineStepBase):
+    def __init__(self):
+        super().__init__(
+            step_name="doc",
+            deps_spec=None,
+            proto_input_type=DocProtoInput,
+            input_type=DocInput,
+            output_type=DocOutput,
+        )
+
+    def config_to_inputs(self, config: ConfigType) -> Iterable[DocInput]:
+        for proto_input in super().config_to_inputs(config):
+            assert isinstance(proto_input, DocProtoInput)
+            dir_path = Path(proto_input.dir_path)
+            for fpath in sorted(dir_path.glob(proto_input.glob)):
+                yield DocInput(
+                    **get_fields_dict(proto_input),
+                    path=str(fpath),
+                    name=fpath.stem,
+                )
+
+    def input_to_output(self, input: DocInput, **kwargs) -> DocOutput:
+        fpath = Path(input.path)
         text = fpath.read_text().strip()
         output = DocOutput(
             **get_fields_dict(input),
-            path=str(fpath),
-            name=fpath.stem,
             text=text,
         )
-        yield output
+        return output
 
 
 class TruncatedDocInput(StepInput):
@@ -54,18 +74,24 @@ class TruncatedDocInput(StepInput):
 class TruncatedDocOutput(TruncatedDocInput):
     text: str
 
-@pipeline.step()
-def truncated_doc(input: TruncatedDocInput, doc: DocOutput, **kwargs) -> Iterable[TruncatedDocOutput]:
-    nsentences = input.nsentences
-    text = doc.text
-    sentences = text.split(".")[:nsentences]
-    sentences = [s.strip() for s in sentences] + [""]
-    new_text = ". ".join(sentences)[:-1]
-    output = TruncatedDocOutput(
-        **get_fields_dict(input),
-        text=new_text,
-    )
-    yield output
+class TruncatedDocStep(PipelineStepBase):
+    def __init__(self):
+        super().__init__(
+            step_name="truncated_doc",
+            deps_spec="doc",
+            input_type=TruncatedDocInput,
+            output_type=TruncatedDocOutput,
+        )
+
+    def input_to_output(self, input: TruncatedDocInput, doc: DocOutput, **kwargs) -> TruncatedDocOutput:
+        sentences = doc.text.split(".")[:input.nsentences]
+        sentences = [s.strip() for s in sentences] + [""]
+        new_text = ". ".join(sentences)[:-1]
+        output = TruncatedDocOutput(
+            **get_fields_dict(input),
+            text=new_text,
+        )
+        return output
 
 
 class TranslatedDocInput(StepInput):
@@ -74,13 +100,28 @@ class TranslatedDocInput(StepInput):
 class TranslatedDocOutput(TranslatedDocInput):
     text: str
 
-@pipeline.step()
-def translated_doc(input: TranslatedDocInput, truncated_doc: TruncatedDocOutput, **kwargs) -> Iterable[TranslatedDocOutput]:
-    language = input.language
-    text = truncated_doc.text
-    new_text = f"[language={language}] {text}"
-    output = TranslatedDocOutput(
-        **get_fields_dict(input),
-        text=new_text,
-    )
-    yield output
+class TranslatedDocStep(PipelineStepBase):
+    def __init__(self):
+        super().__init__(
+            step_name="translated_doc",
+            deps_spec="truncated_doc",
+            input_type=TranslatedDocInput,
+            output_type=TranslatedDocOutput,
+        )
+
+    def input_to_output(self, input: TranslatedDocInput, truncated_doc: TruncatedDocOutput, **kwargs) -> TranslatedDocOutput:
+        new_text = f"[language={input.language}] {truncated_doc.text}"
+        output = TranslatedDocOutput(
+            **get_fields_dict(input),
+            text=new_text,
+        )
+        return output
+
+
+pipeline.add_steps(
+    [
+        DocStep(),
+        TruncatedDocStep(),
+        TranslatedDocStep(),
+    ],
+)

@@ -5,9 +5,7 @@ doc:
 truncated_doc:
   ntrials: 2
   nsentences: [2, 3]
-  deps: doc
 
 translated_doc:
   ntrials: 1
   language: [fr, de]
-  deps: truncated_doc

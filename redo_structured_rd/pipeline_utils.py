@@ -2,7 +2,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 import itertools
 import collections.abc
-from typing import Iterable, Callable, Any, get_type_hints, get_origin, get_args
+from typing import Iterable, Generator, Callable, Any
 
 from omegaconf import DictConfig, OmegaConf
 import pandas as pd
@@ -151,7 +151,6 @@ class ConfigResolver:
                     yield proto_input_type(**config_dict)
 
 
-
 class PipelineInterface:
     @property
     def results(self) -> ResultsSpec:
@@ -163,7 +162,10 @@ class PipelineStepInterface:
     def step_name(self) -> str:
         raise NotImplementedError()
 
-    def resolve_deps(self, pipeline: PipelineInterface) -> Iterable[FullDepsDict]:
+    def set_pipeline(self, pipeline: "PipelineInterface") -> None:
+        self.pipeline = pipeline
+
+    def resolve_deps(self) -> Iterable[FullDepsDict]:
         raise NotImplementedError()
 
     def unpack_deps(self, full_deps_dict: FullDepsDict) -> dict[str, DepsType]:
@@ -199,8 +201,8 @@ class PipelineStepBase(PipelineStepInterface):
     def step_name(self) -> str:
         return self._step_name
 
-    def resolve_deps(self, pipeline: PipelineInterface) -> Iterable[FullDepsDict]:
-        yield from self._deps_resolver.resolve_deps(self.deps_spec, pipeline.results)
+    def resolve_deps(self) -> Iterable[FullDepsDict]:
+        yield from self._deps_resolver.resolve_deps(self.deps_spec, self.pipeline.results)
 
     def unpack_deps(self, full_deps_dict: FullDepsDict) -> dict[str, DepsType]:
         deps_dict = {
@@ -214,6 +216,62 @@ class PipelineStepBase(PipelineStepInterface):
 
     def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
         raise NotImplementedError()
+
+
+class ArtifactRequestBase:
+    pass
+
+
+class ArtifactResponseBase:
+    pass
+
+
+class ArtifactResolverBase:
+    def register_pipeline(self, pipeline: PipelineInterface) -> None:
+        pass
+
+    def resolve_request(self, request: ArtifactRequestBase) -> ArtifactResponseBase:
+        raise NotImplementedError()
+
+
+class PipelineStepWithArtifacts(PipelineStepBase):
+    def __init__(
+        self,
+        step_name: str,
+        deps_spec: list[str]|str|None,
+        artifact_resolver: ArtifactResolverBase,
+        proto_input_type: type[StepInputBase]|None = None,
+        input_type: type[StepInputBase] = StepInputBase,
+        output_type: type[StepOutputBase] = StepOutputBase,
+    ):
+        super().__init__(
+            step_name=step_name,
+            deps_spec=deps_spec,
+            proto_input_type=proto_input_type,
+            input_type=input_type,
+            output_type=output_type,
+        )
+        self._artifact_resolver = artifact_resolver
+
+    def gen_input_to_output(self, input: StepInputBase, **deps: DepsType) \
+            -> Generator[ArtifactRequestBase, ArtifactResponseBase, StepOutputBase]:
+        raise NotImplementedError()
+
+    def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
+        gen = self.gen_input_to_output(input=input, **deps)
+        response: ArtifactResponseBase|None = None
+        while True:
+            try:
+                request = gen.send(response)
+            except StopIteration as error:
+                ret = error.value
+                return ret
+
+            response = self._artifact_resolver.resolve_request(request)
+
+    def set_pipeline(self, pipeline: PipelineInterface) -> None:
+        super().set_pipeline(pipeline)
+        self._artifact_resolver.register_pipeline(pipeline)
 
 
 class PipelineBase(PipelineInterface):
@@ -243,6 +301,7 @@ class PipelineBase(PipelineInterface):
         step_name = step.step_name
         if step_name in self._steps:
             raise ValueError(f"Already registered step named {step_name}")
+        step.set_pipeline(self)
         self._steps[step_name] = step
 
     def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
@@ -254,7 +313,7 @@ class PipelineBase(PipelineInterface):
         self._results[step_name] = []
         config: DictConfig = config_full[step_name]
         for input in step.config_to_inputs(config):
-            for full_deps_dict in step.resolve_deps(pipeline=self):
+            for full_deps_dict in step.resolve_deps():
                 deps_dict = full_deps_dict.to_simple_dict()
                 assert not "input" in deps_dict
                 step_output = step.input_to_output(input=input, **deps_dict)

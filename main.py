@@ -3,10 +3,14 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from examples.main.pydantic_pipeline import pipeline
+# from examples.main.pydantic_pipeline import pipeline
+import examples.artifacts.artifact_pipeline as pipeline_module
 
 
-@hydra.main(version_base=None, config_path="examples/main/config", config_name="default")
+pipeline = pipeline_module.pipeline
+config_path = Path(pipeline_module.__file__).parent / "config"
+
+@hydra.main(version_base=None, config_path=str(config_path), config_name="default")
 def main(config: DictConfig) -> None:
     print("Full config:")
     print(OmegaConf.to_yaml(config))

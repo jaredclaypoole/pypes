@@ -1,0 +1,22 @@
+pipeline:
+  cache_dir: "data/results"
+
+doc:
+  dir_path: "data/raw_documents"
+  glob: "*.txt"
+
+summ:
+  ntrials: 2
+  nwords: 100
+  model: fake-gpt
+  prompt_version: v001-basic
+
+qg:
+  ntrials: 2
+  model: fake-gpt
+  prompt_version: v001-basic
+
+qa:
+  ntrials: 2
+  model: fake-gpt
+  prompt_version: v001-basic

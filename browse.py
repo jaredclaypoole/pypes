@@ -130,7 +130,7 @@ class StepCard(ft.Container):
 
         col = ft.Column(
             [
-                ft.Text(f"{field_name}:  {value}", no_wrap=False)
+                ft.Markdown(f"**{field_name}**:  {value}")
                 for field_name, value in get_fields_dict(self.step_output).items()
             ],
             spacing=0,

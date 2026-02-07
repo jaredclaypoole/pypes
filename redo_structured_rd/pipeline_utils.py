@@ -156,10 +156,18 @@ class PipelineInterface:
     def results(self) -> ResultsSpec:
         raise NotImplementedError()
 
+    @property
+    def cache_base_dir(self) -> Path|None:
+        raise NotImplementedError()
+
 
 class PipelineStepInterface:
     @property
     def step_name(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def cache_subdir(self) -> Path:
         raise NotImplementedError()
 
     def set_pipeline(self, pipeline: "PipelineInterface") -> None:
@@ -182,13 +190,15 @@ class PipelineStepBase(PipelineStepInterface):
     def __init__(
         self,
         step_name: str,
-        deps_spec: list[str]|str|None,
+        substep_name: str = "base",
+        deps_spec: list[str]|str|None = None,
         proto_input_type: type[StepInputBase]|None = None,
         input_type: type[StepInputBase] = StepInputBase,
         output_type: type[StepOutputBase] = StepOutputBase,
     ):
         super().__init__()
         self._step_name = step_name
+        self._substep_name = substep_name
         self.deps_spec = deps_spec
         self.proto_input_type = proto_input_type or input_type
         self.input_type = input_type
@@ -200,6 +210,14 @@ class PipelineStepBase(PipelineStepInterface):
     @property
     def step_name(self) -> str:
         return self._step_name
+
+    @property
+    def substep_name(self) -> str:
+        return self._substep_name
+
+    @property
+    def cache_subdir(self) -> Path:
+        return Path(self.step_name) / self.substep_name
 
     def resolve_deps(self) -> Iterable[FullDepsDict]:
         yield from self._deps_resolver.resolve_deps(self.deps_spec, self.pipeline.results)
@@ -230,6 +248,9 @@ class ArtifactResolverBase:
     def register_pipeline(self, pipeline: PipelineInterface) -> None:
         pass
 
+    def register_step(self, step: PipelineStepInterface) -> None:
+        pass
+
     def resolve_request(self, request: ArtifactRequestBase) -> ArtifactResponseBase:
         raise NotImplementedError()
 
@@ -252,6 +273,7 @@ class PipelineStepWithArtifacts(PipelineStepBase):
             output_type=output_type,
         )
         self._artifact_resolver = artifact_resolver
+        self._artifact_resolver.register_step(self)
 
     def gen_input_to_output(self, input: StepInputBase, **deps: DepsType) \
             -> Generator[ArtifactRequestBase, ArtifactResponseBase, StepOutputBase]:
@@ -278,12 +300,23 @@ class PipelineBase(PipelineInterface):
     def __init__(self):
         self._steps: dict[str, PipelineStepInterface] = {}
         self._results: ResultsSpec = {}
+        self._cache_base_dir: Path|None = None
 
     @property
     def results(self) -> ResultsSpec:
         return self._results
 
+    @property
+    def cache_base_dir(self) -> Path|None:
+        return self._cache_base_dir
+
+    def process_config(self, config_full: DictConfig) -> None:
+        sub_config: DictConfig = config_full.get("pipeline", DictConfig({}))
+        if cache_base_dir := sub_config.get("cache_base_dir"):
+            self._cache_base_dir = Path(cache_base_dir)
+
     def run(self, config: DictConfig) -> None:
+        self.process_config(config)
         for step_name in self._steps.keys():
             self._execute_step(step_name, config_full=config)
 

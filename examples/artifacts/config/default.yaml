@@ -1,5 +1,5 @@
 pipeline:
-  cache_dir: "data/results"
+  cache_base_dir: "data/results"
 
 doc:
   dir_path: "data/raw_documents"

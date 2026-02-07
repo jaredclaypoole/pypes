@@ -1,16 +1,19 @@
 from pathlib import Path
 import random
 from string import Template
+import hashlib
 from typing import Iterable, Any, Generator
 
 from pydantic import BaseModel
 
 from redo_structured_rd.pipeline_utils import (
+    PipelineStepInterface,
     PipelineStepBase,
     PipelineStepWithArtifacts,
     ArtifactRequestBase,
     ArtifactResponseBase,
     ArtifactResolverBase,
+    PipelineInterface,
     PipelineBase,
     StepInputBase,
     StepOutputBase,
@@ -75,6 +78,7 @@ class DocStep(PipelineStepBase):
 
 
 class FakeLLMArtifactRequest(ArtifactRequestBase, BaseModel, frozen=True):
+    input: StepInput
     model: str
     prompt_template_str: str
     prompt_kwargs: dict[str, str]
@@ -87,22 +91,129 @@ class FakeLLMArtifactResponse(ArtifactResponseBase, BaseModel, frozen=True):
     text: str
 
 
+def hash(obj: Any) -> str:
+    if isinstance(obj, BaseModel):
+        return hash(tuple(get_fields_dict(obj).items()))
+    elif isinstance(obj, tuple):
+        return hash(str(obj))
+    elif isinstance(obj, list):
+        return hash(tuple(obj))
+    elif isinstance(obj, dict):
+        return hash(tuple(obj.items()))
+    elif isinstance(obj, (int, float)):
+        return hash(str(obj))
+    elif isinstance(obj, str):
+        return hashlib.sha256(obj.encode("utf-8")).hexdigest()
+    else:
+        raise NotImplementedError(type(obj))
+
+
+class CachedStringDictBase:
+    def __init__(
+        self,
+        assert_exists: bool = False,
+    ):
+        self._data: dict[str, str] = {}
+        self._init_cache(assert_exists=assert_exists)
+
+    def _init_cache(self, assert_exists: bool) -> None:
+        raise NotImplementedError()
+
+    def _update_cache(self, key: str, value: str) -> None:
+        raise NotImplementedError()
+
+    def __setitem__(self, key: str, value: str) -> None:
+        self._update_cache(key, value)
+        self._data[key] = value
+
+    def __getitem__(self, key: str) -> str:
+        return self._data[key]
+
+    def items(self) -> Iterable[tuple[str, str]]:
+        yield from self._data.items()
+
+    def keys(self) -> Iterable[str]:
+        yield from self._data.keys()
+
+    def values(self) -> Iterable[str]:
+        yield from self._data.values()
+
+    def __iter__(self) -> Iterable[str]:
+        yield from self.keys()
+
+
+class DirCachedStringDict(CachedStringDictBase):
+    def __init__(
+        self,
+        cache_dir: Path,
+        assert_exists: bool = False,
+    ):
+        self.cache_dir = cache_dir
+        super().__init__(assert_exists=assert_exists)
+
+    def _init_cache(self, assert_exists: bool) -> None:
+        if assert_exists:
+            assert self.cache_dir.exists()
+        else:
+            self.cache_dir.mkdir(exist_ok=True, parents=True)
+
+        fpaths = sorted(self.cache_dir.glob("*.txt"))
+        for fpath in fpaths:
+            self._data[fpath.stem] = fpath.read_text().strip()
+
+    def _update_cache(self, key: str, value: str) -> None:
+        with open(self.cache_dir / f"{key}.txt", 'w') as ftxt:
+            print(value, file=ftxt)
+
+
 class ArtifactResolver(ArtifactResolverBase):
+    def __init__(self):
+        super().__init__()
+        self.pipeline: PipelineInterface|None = None
+        self.step: PipelineStepInterface|None = None
+
+        self._cache_dict_by_dir: dict[Path, DirCachedStringDict] = {}
+
+    def register_pipeline(self, pipeline: PipelineInterface) -> None:
+        self.pipeline = pipeline
+
+    def register_step(self, step: PipelineStepInterface) -> None:
+        self.step = step
+
     def resolve_request(self, request: ArtifactRequestBase) -> ArtifactResponseBase:
         assert isinstance(request, FakeLLMArtifactRequest)
-        if request.cache:
-            raise NotImplementedError("We still need to implement caching; for now we just have artifact control flow without caching")
+        response_text: str|None = None
 
-        random_value = random.randint(10_000, 99_999)
-        prompt_template = Template(
-            request.prompt_template_str,
-        )
-        prompt_text = prompt_template.substitute(**request.prompt_kwargs)
-        response_text = f"""
+        if request.cache:
+            cache_base_dir = self.pipeline.cache_base_dir
+            assert cache_base_dir is not None
+            step_cache_dir = cache_base_dir / self.step.cache_subdir
+            cache_dir = step_cache_dir / request.cache_heading
+            cache_dict = self._cache_dict_by_dir.get(cache_dir)
+            if cache_dict is None:
+                cache_dict = DirCachedStringDict(cache_dir=cache_dir)
+                self._cache_dict_by_dir[cache_dir] = cache_dict
+
+            request_key = hash(request)
+            if request_key in cache_dict:
+                response_text = cache_dict[request_key]
+
+        if response_text is None:
+            random_value = random.randint(10_000, 99_999)
+            prompt_template = Template(
+                request.prompt_template_str,
+            )
+            prompt_text = prompt_template.substitute(**request.prompt_kwargs)
+            response_text = f"""
 [randomness={random_value}]
+[model={request.model}]
 This is a fake LLM response to the following prompt:
 {prompt_text}
 """.strip()
+
+            if request.cache:
+                cache_dict[request_key] = response_text
+
         return FakeLLMArtifactResponse(
             request=request,
             text=response_text,
@@ -151,14 +262,12 @@ Summary:
             doc=doc.text,
             nwords=f"{input.nwords}",
         )
-        do_cache = False
-        if not do_cache:
-            print(f"Warning: Not caching")
         request = FakeLLMArtifactRequest(
+            input=input,
             model=input.model,
             prompt_template_str=prompt_template_str,
             prompt_kwargs=prompt_kwargs,
-            cache=do_cache,
+            cache=True,
         )
 
         response = yield request

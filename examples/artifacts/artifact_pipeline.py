@@ -96,17 +96,17 @@ class FakeLLMArtifactResponse(ArtifactResponseBase, BaseModel, frozen=True):
     text: str
 
 
-def hash(obj: Any) -> str:
+def myhash(obj: Any) -> str:
     if isinstance(obj, BaseModel):
-        return hash(tuple(get_fields_dict(obj).items()))
+        return myhash(tuple(get_fields_dict(obj).items()))
     elif isinstance(obj, tuple):
-        return hash(str(obj))
+        return myhash(str(obj))
     elif isinstance(obj, list):
-        return hash(tuple(obj))
+        return myhash(tuple(obj))
     elif isinstance(obj, dict):
-        return hash(tuple(obj.items()))
+        return myhash(tuple(obj.items()))
     elif isinstance(obj, (int, float)):
-        return hash(str(obj))
+        return myhash(str(obj))
     elif isinstance(obj, str):
         return hashlib.sha256(obj.encode("utf-8")).hexdigest()
     else:
@@ -199,7 +199,7 @@ class ArtifactResolver(ArtifactResolverBase):
                 cache_dict = DirCachedStringDict(cache_dir=cache_dir)
                 self._cache_dict_by_dir[cache_dir] = cache_dict
 
-            request_key = hash(request)
+            request_key = myhash(request)
             if request_key in cache_dict:
                 response_text = cache_dict[request_key]
 

@@ -9,9 +9,10 @@ import flet as ft
 
 from pydantic import BaseModel
 
-from redo_structured_rd.pipeline_utils import (
+from redo_structured_rd.core.mytyping import (
     FullStepOutput, StepOutputBase, FullDepsDict,
 )
+
 
 from examples.main.pydantic_pipeline import(
     StepInput,

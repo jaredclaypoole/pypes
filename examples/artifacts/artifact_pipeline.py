@@ -6,19 +6,24 @@ from typing import Iterable, Any, Generator
 
 from pydantic import BaseModel
 
-from redo_structured_rd.pipeline_utils import (
-    PipelineStepInterface,
-    PipelineStepBase,
-    PipelineStepWithArtifacts,
-    ArtifactRequestBase,
-    ArtifactResponseBase,
-    ArtifactResolverBase,
-    PipelineInterface,
-    PipelineBase,
+from redo_structured_rd.core.mytyping import (
     StepInputBase,
     StepOutputBase,
     ConfigType,
 )
+from redo_structured_rd.core.interface import (
+    PipelineStepInterface,
+    PipelineInterface,
+)
+from redo_structured_rd.base.step import PipelineStepBase
+from redo_structured_rd.base.pipeline import PipelineBase
+from redo_structured_rd.artifacts.base import (
+    ArtifactRequestBase,
+    ArtifactResponseBase,
+    ArtifactResolverBase,
+)
+from redo_structured_rd.artifacts.step import PipelineStepWithArtifacts
+
 
 def get_fields_dict(model: BaseModel) -> dict[str, Any]:
     return {name: getattr(model, name) for name in type(model).model_fields}

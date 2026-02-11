@@ -3,7 +3,7 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-# from examples.main.pydantic_pipeline import pipeline
+# import examples.main.pydantic_pipeline as pipeline_module
 import examples.artifacts.artifact_pipeline as pipeline_module
 
 

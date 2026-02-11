@@ -2,7 +2,7 @@ from functools import cached_property
 import random
 from string import Template
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ...core.interface import StepInputBase
 from .base import (
@@ -21,6 +21,7 @@ class FakeLLMArtifactResponse(ArtifactResponseBase, BaseModel, frozen=True):
 
 
 class FakeLLMArtifactSelfRequest(ArtifactSelfRequestBase, BaseModel, frozen=True):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     input: StepInputBase
     model: str
     prompt_template_str: str

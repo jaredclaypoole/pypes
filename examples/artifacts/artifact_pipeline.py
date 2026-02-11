@@ -5,22 +5,22 @@ from typing import Iterable, Generator
 
 from pydantic import BaseModel
 
-from redo_structured_rd.core.mytyping import (
+from pypes.core.mytyping import (
     StepInputBase,
     StepOutputBase,
     ConfigType,
 )
-from redo_structured_rd.base.step import PipelineStepBase
-from redo_structured_rd.base.pipeline import PipelineBase
-from redo_structured_rd.artifacts.base import (
+from pypes.base.step import PipelineStepBase
+from pypes.base.pipeline import PipelineBase
+from pypes.artifacts.base import (
     ArtifactRequestBase,
     ArtifactResponseBase,
 )
-from redo_structured_rd.artifacts.step import PipelineStepWithArtifacts
-from redo_structured_rd.utils.pydantic_utils import get_fields_dict
+from pypes.artifacts.step import PipelineStepWithArtifacts
+from pypes.utils.pydantic_utils import get_fields_dict
 
-from redo_structured_rd.artifacts.self.serial import ArtifactSerialSelfResolver
-from redo_structured_rd.artifacts.self.fakellm import FakeLLMArtifactSelfRequest, FakeLLMArtifactResponse
+from pypes.artifacts.self.serial import ArtifactSerialSelfResolver
+from pypes.artifacts.self.fakellm import FakeLLMArtifactSelfRequest, FakeLLMArtifactResponse
 
 
 class Pipeline(PipelineBase):

@@ -3,13 +3,13 @@ from typing import Iterable, Any
 
 from pydantic import BaseModel
 
-from redo_structured_rd.core.mytyping import (
+from pypes.core.mytyping import (
     StepInputBase,
     StepOutputBase,
     ConfigType,
 )
-from redo_structured_rd.base.step import PipelineStepBase
-from redo_structured_rd.base.pipeline import PipelineBase
+from pypes.base.step import PipelineStepBase
+from pypes.base.pipeline import PipelineBase
 
 
 def get_fields_dict(model: BaseModel) -> dict[str, Any]:

@@ -9,7 +9,7 @@ import flet as ft
 
 from pydantic import BaseModel
 
-from redo_structured_rd.core.mytyping import (
+from pypes.core.mytyping import (
     FullStepOutput, StepOutputBase, FullDepsDict,
 )
 

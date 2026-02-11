@@ -1,8 +1,7 @@
 from pathlib import Path
 import random
 from string import Template
-import hashlib
-from typing import Iterable, Any, Generator
+from typing import Iterable, Generator
 
 from pydantic import BaseModel
 
@@ -11,22 +10,17 @@ from redo_structured_rd.core.mytyping import (
     StepOutputBase,
     ConfigType,
 )
-from redo_structured_rd.core.interface import (
-    PipelineStepInterface,
-    PipelineInterface,
-)
 from redo_structured_rd.base.step import PipelineStepBase
 from redo_structured_rd.base.pipeline import PipelineBase
 from redo_structured_rd.artifacts.base import (
     ArtifactRequestBase,
     ArtifactResponseBase,
-    ArtifactResolverBase,
 )
 from redo_structured_rd.artifacts.step import PipelineStepWithArtifacts
+from redo_structured_rd.utils.pydantic_utils import get_fields_dict
 
-
-def get_fields_dict(model: BaseModel) -> dict[str, Any]:
-    return {name: getattr(model, name) for name in type(model).model_fields}
+from redo_structured_rd.artifacts.self.serial import ArtifactSerialSelfResolver
+from redo_structured_rd.artifacts.self.fakellm import FakeLLMArtifactSelfRequest, FakeLLMArtifactResponse
 
 
 class Pipeline(PipelineBase):
@@ -36,7 +30,7 @@ class Pipeline(PipelineBase):
 pipeline = Pipeline()
 
 
-class StepInput(BaseModel, frozen=True):
+class StepInput(StepInputBase, BaseModel, frozen=True):
     trial: int
 
 
@@ -82,149 +76,6 @@ class DocStep(PipelineStepBase):
         return output
 
 
-class FakeLLMArtifactRequest(ArtifactRequestBase, BaseModel, frozen=True):
-    input: StepInput
-    model: str
-    prompt_template_str: str
-    prompt_kwargs: dict[str, str]
-    cache: bool = True
-    cache_heading: str = "default"
-
-
-class FakeLLMArtifactResponse(ArtifactResponseBase, BaseModel, frozen=True):
-    request: FakeLLMArtifactRequest
-    text: str
-
-
-def myhash(obj: Any) -> str:
-    if isinstance(obj, BaseModel):
-        return myhash(tuple(get_fields_dict(obj).items()))
-    elif isinstance(obj, tuple):
-        return myhash(str(obj))
-    elif isinstance(obj, list):
-        return myhash(tuple(obj))
-    elif isinstance(obj, dict):
-        return myhash(tuple(obj.items()))
-    elif isinstance(obj, (int, float)):
-        return myhash(str(obj))
-    elif isinstance(obj, str):
-        return hashlib.sha256(obj.encode("utf-8")).hexdigest()
-    else:
-        raise NotImplementedError(type(obj))
-
-
-class CachedStringDictBase:
-    def __init__(
-        self,
-        assert_exists: bool = False,
-    ):
-        self._data: dict[str, str] = {}
-        self._init_cache(assert_exists=assert_exists)
-
-    def _init_cache(self, assert_exists: bool) -> None:
-        raise NotImplementedError()
-
-    def _update_cache(self, key: str, value: str) -> None:
-        raise NotImplementedError()
-
-    def __setitem__(self, key: str, value: str) -> None:
-        self._update_cache(key, value)
-        self._data[key] = value
-
-    def __getitem__(self, key: str) -> str:
-        return self._data[key]
-
-    def items(self) -> Iterable[tuple[str, str]]:
-        yield from self._data.items()
-
-    def keys(self) -> Iterable[str]:
-        yield from self._data.keys()
-
-    def values(self) -> Iterable[str]:
-        yield from self._data.values()
-
-    def __iter__(self) -> Iterable[str]:
-        yield from self.keys()
-
-
-class DirCachedStringDict(CachedStringDictBase):
-    def __init__(
-        self,
-        cache_dir: Path,
-        assert_exists: bool = False,
-    ):
-        self.cache_dir = cache_dir
-        super().__init__(assert_exists=assert_exists)
-
-    def _init_cache(self, assert_exists: bool) -> None:
-        if assert_exists:
-            assert self.cache_dir.exists()
-        else:
-            self.cache_dir.mkdir(exist_ok=True, parents=True)
-
-        fpaths = sorted(self.cache_dir.glob("*.txt"))
-        for fpath in fpaths:
-            self._data[fpath.stem] = fpath.read_text().strip()
-
-    def _update_cache(self, key: str, value: str) -> None:
-        with open(self.cache_dir / f"{key}.txt", 'w') as ftxt:
-            print(value, file=ftxt)
-
-
-class ArtifactResolver(ArtifactResolverBase):
-    def __init__(self):
-        super().__init__()
-        self.pipeline: PipelineInterface|None = None
-        self.step: PipelineStepInterface|None = None
-
-        self._cache_dict_by_dir: dict[Path, DirCachedStringDict] = {}
-
-    def register_pipeline(self, pipeline: PipelineInterface) -> None:
-        self.pipeline = pipeline
-
-    def register_step(self, step: PipelineStepInterface) -> None:
-        self.step = step
-
-    def resolve_request(self, request: ArtifactRequestBase) -> ArtifactResponseBase:
-        assert isinstance(request, FakeLLMArtifactRequest)
-        response_text: str|None = None
-
-        if request.cache:
-            cache_base_dir = self.pipeline.cache_base_dir
-            assert cache_base_dir is not None
-            step_cache_dir = cache_base_dir / self.step.cache_subdir
-            cache_dir = step_cache_dir / request.cache_heading
-            cache_dict = self._cache_dict_by_dir.get(cache_dir)
-            if cache_dict is None:
-                cache_dict = DirCachedStringDict(cache_dir=cache_dir)
-                self._cache_dict_by_dir[cache_dir] = cache_dict
-
-            request_key = myhash(request)
-            if request_key in cache_dict:
-                response_text = cache_dict[request_key]
-
-        if response_text is None:
-            random_value = random.randint(10_000, 99_999)
-            prompt_template = Template(
-                request.prompt_template_str,
-            )
-            prompt_text = prompt_template.substitute(**request.prompt_kwargs)
-            response_text = f"""
-[randomness={random_value}]
-[model={request.model}]
-This is a fake LLM response to the following prompt:
-{prompt_text}
-""".strip()
-
-            if request.cache:
-                cache_dict[request_key] = response_text
-
-        return FakeLLMArtifactResponse(
-            request=request,
-            text=response_text,
-        )
-
-
 class SummInput(StepInput):
     nwords: int
     model: str
@@ -240,7 +91,7 @@ class SummStep(PipelineStepWithArtifacts):
         super().__init__(
             step_name="summ",
             deps_spec="doc",
-            artifact_resolver=ArtifactResolver(),
+            artifact_resolver=ArtifactSerialSelfResolver(),
             input_type=SummInput,
             output_type=SummOutput,
         )
@@ -267,12 +118,12 @@ Summary:
             doc=doc.text,
             nwords=f"{input.nwords}",
         )
-        request = FakeLLMArtifactRequest(
+        request = FakeLLMArtifactSelfRequest(
             input=input,
             model=input.model,
             prompt_template_str=prompt_template_str,
             prompt_kwargs=prompt_kwargs,
-            cache=True,
+            cache_heading="default",
         )
 
         response = yield request

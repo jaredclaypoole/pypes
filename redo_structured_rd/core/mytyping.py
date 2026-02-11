@@ -15,6 +15,7 @@ class StepInputBase:
 class StepOutputBase:
     pass
 
+
 DepsType = StepOutputBase
 DepsSpecType = list[str]|str|None
 

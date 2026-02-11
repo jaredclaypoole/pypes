@@ -1,8 +1,11 @@
 from ..core.interface import PipelineStepInterface, PipelineInterface
+from .caching import ArtifactCacheKey, ArtifactCache
 
 
 class ArtifactRequestBase:
-    pass
+    @property
+    def cache_key(self) -> ArtifactCacheKey:
+        raise NotImplementedError()
 
 
 class ArtifactResponseBase:
@@ -10,11 +13,18 @@ class ArtifactResponseBase:
 
 
 class ArtifactResolverBase:
+    def __init__(self):
+        super().__init__()
+        self.pipeline: PipelineInterface|None = None
+        self.step: PipelineStepInterface|None = None
+
+        self.step_cache = ArtifactCache()
+
     def register_pipeline(self, pipeline: PipelineInterface) -> None:
-        pass
+        self.pipeline = pipeline
 
     def register_step(self, step: PipelineStepInterface) -> None:
-        pass
+        self.step = step
 
     def resolve_request(self, request: ArtifactRequestBase) -> ArtifactResponseBase:
         raise NotImplementedError()

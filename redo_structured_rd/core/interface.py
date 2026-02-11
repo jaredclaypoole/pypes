@@ -27,7 +27,7 @@ class PipelineStepInterface:
         raise NotImplementedError()
 
     @property
-    def proto_input_type(self) -> str:
+    def proto_input_type(self) -> type[StepInputBase]:
         raise NotImplementedError()
 
     @property

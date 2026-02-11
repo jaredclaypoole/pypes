@@ -39,7 +39,7 @@ class PipelineStepBase(PipelineStepInterface):
         return self._step_name
 
     @property
-    def proto_input_type(self) -> StepInputBase:
+    def proto_input_type(self) -> type[StepInputBase]:
         return self._proto_input_type
 
     @property

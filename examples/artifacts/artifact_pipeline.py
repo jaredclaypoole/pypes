@@ -1,6 +1,4 @@
 from pathlib import Path
-import random
-from string import Template
 from typing import Iterable, Generator
 
 from pydantic import BaseModel

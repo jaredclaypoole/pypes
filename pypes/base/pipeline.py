@@ -60,7 +60,7 @@ class PipelineBase(PipelineInterface):
         step = self._steps[step_name]
         assert step_name not in self._results
         self._results[step_name] = []
-        config: ConfigType = config_full[step_name]
+        config: SubConfigType = config_full[step_name]
         for input in step.config_to_inputs(config):
             for full_deps_dict in step.resolve_deps():
                 deps_dict = full_deps_dict.to_simple_dict()

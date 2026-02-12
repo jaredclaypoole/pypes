@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .mytyping import (
-    ConfigType,
+    SubConfigType,
     DepsType,
     FullDepsDict,
     StepInputBase,
@@ -43,7 +43,7 @@ class PipelineStepInterface:
     def unpack_deps(self, full_deps_dict: FullDepsDict) -> dict[str, DepsType]:
         raise NotImplementedError()
 
-    def config_to_inputs(self, config: ConfigType) -> Iterable[StepInputBase]:
+    def config_to_inputs(self, config: SubConfigType) -> Iterable[StepInputBase]:
         raise NotImplementedError()
 
     def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:

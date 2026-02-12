@@ -4,7 +4,7 @@ from typing import Iterable
 from ..core.mytyping import (
     DepsType,
     FullDepsDict,
-    SubConfigType,
+    ConfigType,
     StepInputBase,
     StepOutputBase,
 )
@@ -60,8 +60,9 @@ class PipelineStepBase(PipelineStepInterface):
         }
         return deps_dict
 
-    def config_to_inputs(self, config: SubConfigType) -> Iterable[StepInputBase]:
-        yield from self._config_resolver.resolve_sub_config(config)
+    def full_config_to_inputs(self, full_config: ConfigType) -> Iterable[StepInputBase]:
+        sub_config = self._config_resolver.get_sub_config(full_config)
+        yield from self._config_resolver.resolve_sub_config(sub_config)
 
     def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
         raise NotImplementedError()

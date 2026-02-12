@@ -26,15 +26,15 @@ class PipelineBase(PipelineInterface):
     def cache_base_dir(self) -> Path|None:
         return self._cache_base_dir
 
-    def process_config(self, config_full: ConfigType) -> None:
-        sub_config: SubConfigType = config_full.get("pipeline", SubConfigType({}))
+    def process_config(self, full_config: ConfigType) -> None:
+        sub_config: SubConfigType = full_config.get("pipeline", SubConfigType({}))
         if cache_base_dir := sub_config.get("cache_base_dir"):
             self._cache_base_dir = Path(cache_base_dir)
 
     def run(self, config: ConfigType) -> None:
         self.process_config(config)
         for step_name in self._steps.keys():
-            self._execute_step(step_name, config_full=config)
+            self._execute_step(step_name, full_config=config)
 
     def save_results(self, dill_path: Path|None = None) -> None:
         if dill_path is None:
@@ -56,12 +56,11 @@ class PipelineBase(PipelineInterface):
     def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
         return self._results[step_name]
 
-    def _execute_step(self, step_name: str, config_full: ConfigType) -> None:
+    def _execute_step(self, step_name: str, full_config: ConfigType) -> None:
         step = self._steps[step_name]
         assert step_name not in self._results
         self._results[step_name] = []
-        config: SubConfigType = config_full[step_name]
-        for input in step.config_to_inputs(config):
+        for input in step.full_config_to_inputs(full_config):
             for full_deps_dict in step.resolve_deps():
                 deps_dict = full_deps_dict.to_simple_dict()
                 assert not "input" in deps_dict

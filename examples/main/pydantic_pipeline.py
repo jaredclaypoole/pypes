@@ -48,8 +48,8 @@ class DocStep(PipelineStepBase):
             output_type=DocOutput,
         )
 
-    def config_to_inputs(self, config: ConfigType) -> Iterable[DocInput]:
-        for proto_input in super().config_to_inputs(config):
+    def full_config_to_inputs(self, full_config: ConfigType) -> Iterable[DocInput]:
+        for proto_input in super().full_config_to_inputs(full_config):
             assert isinstance(proto_input, DocProtoInput)
             dir_path = Path(proto_input.dir_path)
             for fpath in sorted(dir_path.glob(proto_input.glob)):

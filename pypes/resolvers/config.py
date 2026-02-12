@@ -1,7 +1,7 @@
 import itertools
 from typing import Iterable
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 from ..core.mytyping import (
     ConfigType, SubConfigType,
@@ -16,10 +16,16 @@ class ConfigResolver:
         super().__init__()
         self.step = step
 
-    def get_sub_config(self, full_config: ConfigType) -> SubConfigType:
+    def get_sub_configs(self, full_config: ConfigType) -> Iterable[SubConfigType]:
         step_name = self.step.step_name
-        sub_config = full_config[step_name]
-        return sub_config
+        proto_sub_config = full_config[step_name]
+        if isinstance(proto_sub_config, ListConfig):
+            for sub_config in proto_sub_config:
+                yield sub_config
+        elif isinstance(proto_sub_config, SubConfigType):
+            yield proto_sub_config
+        else:
+            raise NotImplementedError(type(proto_sub_config))
 
     def resolve_sub_config(self, sub_config: SubConfigType) -> Iterable[StepInputBase]:
         proto_input_type = self.step.proto_input_type

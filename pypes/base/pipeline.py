@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Iterable
 
 import dill
+from tqdm import tqdm
 
 from ..core.interface import PipelineStepInterface, PipelineInterface
 from ..core.mytyping import (
@@ -60,14 +61,16 @@ class PipelineBase(PipelineInterface):
         step = self._steps[step_name]
         assert step_name not in self._results
         self._results[step_name] = []
-        for input in step.full_config_to_inputs(full_config):
-            for full_deps_dict in step.resolve_deps():
-                deps_dict = full_deps_dict.to_simple_dict()
-                assert not "input" in deps_dict
-                step_output = step.input_to_output(input=input, **deps_dict)
-                full_step_output = FullStepOutput(
-                    deps=full_deps_dict,
-                    output=step_output,
-                    step_name=step_name,
-                )
-                self._results[step_name].append(full_step_output)
+        with tqdm(desc=f"{step_name} ") as pbar:
+            for input in step.full_config_to_inputs(full_config):
+                for full_deps_dict in step.resolve_deps():
+                    deps_dict = full_deps_dict.to_simple_dict()
+                    assert not "input" in deps_dict
+                    step_output = step.input_to_output(input=input, **deps_dict)
+                    full_step_output = FullStepOutput(
+                        deps=full_deps_dict,
+                        output=step_output,
+                        step_name=step_name,
+                    )
+                    self._results[step_name].append(full_step_output)
+                    pbar.update()

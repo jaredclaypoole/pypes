@@ -6,6 +6,7 @@ from ..core.mytyping import (
     FullDepsDict,
     FullStepOutput,
 )
+from ..utils.merging import merge_on_identity_intersection_or_cross
 
 
 class DepsResolver:
@@ -24,6 +25,9 @@ class DepsResolver:
             if df0 is None:
                 df0 = df1
             else:
-                df0 = df0.join(df1, how="outer")
+                df0 = merge_on_identity_intersection_or_cross(
+                    df0,
+                    df1,
+                )
 
         return FullDepsDict.list_from_df(df0)

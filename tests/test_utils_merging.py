@@ -10,7 +10,7 @@ class MyLabel:
         self.label = label
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.label!r})"
+        return f"{type(self).__name__}({self.label!r})"  # pragma: no cover
 
 
 def test_bad_prefer():

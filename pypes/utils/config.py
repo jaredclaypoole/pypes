@@ -7,4 +7,4 @@ def sub_config_to_dict(sub_config: SubConfigType) -> dict:
     if isinstance(sub_config, DictConfig):
         return OmegaConf.to_container(sub_config)
     else:
-        raise NotImplementedError(type(sub_config))
+        raise NotImplementedError(type(sub_config))  # pragma: no cover

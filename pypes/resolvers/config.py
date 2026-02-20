@@ -12,13 +12,20 @@ from ..utils.config import sub_config_to_dict
 
 
 class ConfigResolver:
-    def __init__(self, step: PipelineStepInterface):
+    def __init__(self, step_name: str, proto_input_type: type[StepInputBase]):
         super().__init__()
-        self.step = step
+        self.step_name = step_name
+        self.proto_input_type = proto_input_type
+
+    @classmethod
+    def from_step(cls, step: PipelineStepInterface) -> "ConfigResolver":
+        return cls(
+            step_name=step.step_name,
+            proto_input_type=step.proto_input_type,
+        )
 
     def get_sub_configs(self, full_config: ConfigType) -> Iterable[SubConfigType]:
-        step_name = self.step.step_name
-        proto_sub_config = full_config[step_name]
+        proto_sub_config = full_config[self.step_name]
         if isinstance(proto_sub_config, ListConfig):
             for sub_config in proto_sub_config:
                 yield sub_config
@@ -28,7 +35,7 @@ class ConfigResolver:
             raise NotImplementedError(type(proto_sub_config))
 
     def resolve_sub_config(self, sub_config: SubConfigType) -> Iterable[StepInputBase]:
-        proto_input_type = self.step.proto_input_type
+        proto_input_type = self.proto_input_type
         sub_config = sub_config_to_dict(sub_config).copy()
         ntrials = sub_config.pop("ntrials", 1)
         config_dict0 = {}

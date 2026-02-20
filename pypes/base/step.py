@@ -32,7 +32,7 @@ class PipelineStepBase(PipelineStepInterface):
         self.output_type = output_type
 
         self._deps_resolver = DepsResolver()
-        self._config_resolver = ConfigResolver(self)
+        self._config_resolver = ConfigResolver.from_step(self)
 
     @property
     def step_name(self) -> str:

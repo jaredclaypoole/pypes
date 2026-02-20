@@ -9,6 +9,7 @@ def merge_on_identity_intersection_or_cross(
     validate: str | None = "one_to_one",
     prefer: str = "left",  # for restoring original key objects when key intersection is non-empty
     keep_order: bool = True,  # preserve df0 order, then df1-only order (outer only)
+    expect_same_keys: bool = True,
 ) -> pd.DataFrame:
     """
     Merge df0 and df1 on the intersection of their columns, using identity semantics
@@ -45,6 +46,21 @@ def merge_on_identity_intersection_or_cross(
         dup = k1[k1.duplicated(keep=False)]
         raise ValueError(f"df1 has duplicate composite keys; example: {dup.iloc[0]!r}")
 
+    if expect_same_keys:
+        s0 = set(k0.values)
+        s1 = set(k1.values)
+        if s0 != s1:
+            missing_in_df1 = list(s0 - s1)[:3]
+            missing_in_df0 = list(s1 - s0)[:3]
+            raise ValueError(
+                "Key sets differ between df0 and df1. "
+                f"missing_in_df1(examples)={missing_in_df1!r}, missing_in_df0(examples)={missing_in_df0!r}"
+            )
+
+        # If key sets are identical, outer == inner (row-wise), so prefer an inner join.
+        if how == "outer":
+            how = "inner"
+
     # Build proxy->original lookup for restoring key objects
     lookup0 = df0.assign(_k=k0).set_index("_k")[key_cols]
     lookup1 = df1.assign(_k=k1).set_index("_k")[key_cols]
@@ -75,4 +91,6 @@ def merge_on_identity_intersection_or_cross(
         merged[c] = real_keys.map(lambda d: d.get(c) if isinstance(d, dict) else pd.NA)
 
     other_cols = [c for c in merged.columns if c not in {"_k", *key_cols}]
-    return merged[key_cols + other_cols]
+    merged = merged[key_cols + other_cols]
+    merged = merged.reset_index(drop=True)
+    return merged

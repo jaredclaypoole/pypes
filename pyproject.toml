@@ -18,6 +18,10 @@ dependencies = [
 
 [project.optional-dependencies]
 viz = ["flet>=0.80.5"]
+dev = [
+    "pytest>=8",
+    "coverage[toml]>=7",
+]
 
 [project.scripts]
 pypes = "main:main"
@@ -25,3 +29,9 @@ pypes = "main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pypes*"]
+
+[tool.coverage.run]
+source = ["pypes"]
+
+[tool.coverage.report]
+include_namespace_packages = true

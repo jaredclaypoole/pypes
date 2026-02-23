@@ -20,12 +20,17 @@ DepsType = StepOutputBase
 DepsSpecType = list[str]|str|None
 
 
-class FullDepsDict(dict):
+class FullDepsDict:
     def __init__(self, upstream_by_label: dict[str, "FullStepOutput"]):
-        super().__init__(upstream_by_label)
+        super().__init__()
+        self._data = upstream_by_label
+
+    @property
+    def data(self) -> dict[str, "FullStepOutput"]:
+        return dict(self._data)
 
     def as_row(self) -> pd.Series:
-        return pd.Series(list(self.values()), index=list(self.keys()))
+        return pd.Series(list(self._data.values()), index=list(self._data.keys()))
 
     @classmethod
     def from_row(cls, row: pd.Series) -> "FullDepsDict":
@@ -41,11 +46,17 @@ class FullDepsDict(dict):
     def to_simple_dict(self) -> dict[str, StepOutputBase]:
         return {
             name: full_step_output.output
-            for name, full_step_output in self.items()
+            for name, full_step_output in self._data.items()
         }
 
     def __hash__(self):
         return object.__hash__(self)
+
+    def __eq__(self, other: object):
+        return object.__eq__(self, other)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self._data!r})"
 
 
 @dataclass(frozen=True, eq=False)

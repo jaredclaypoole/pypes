@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from omegaconf import DictConfig
 
 from pypes.core.mytyping import FullStepOutput, FullDepsDict
@@ -119,17 +121,22 @@ def get_prev_results(step_number: int) -> dict[str, list[FullStepOutput]]:
     return {name: all_results[name] for name in prev_step_names}
 
 
+def fdd_comp_list(fdd_list: Iterable[FullDepsDict]) -> list[dict[str, FullStepOutput]]:
+    # convert FullDepsDict instances to raw dicts
+    return [fdd.data for fdd in fdd_list]
+
+
 @pytest.mark.parametrize("step_num", list(range(1, len(all_results)+1)))
 def test_deps_resolver(step_num: int):
     step_name = f"step{step_num}"
     prev_results = get_prev_results(step_num)
     dr = DepsResolver()
-    fdds_actual = list(dr.resolve_deps(
+    fdds_actual = fdd_comp_list(dr.resolve_deps(
         deps_spec=deps_spec_by_step_name[step_name],
         prev_results=prev_results,
     ))
     if step_name in ["step1", "step5"]:
-        fdds_expected = [FullDepsDict({})]
+        fdds_expected = fdd_comp_list([FullDepsDict({})])
     else:
-        fdds_expected = [fso.deps for fso in all_results[step_name]]
+        fdds_expected = fdd_comp_list([fso.deps for fso in all_results[step_name]])
     assert fdds_actual == fdds_expected

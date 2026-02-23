@@ -32,7 +32,7 @@ class ConfigResolver:
         elif isinstance(proto_sub_config, SubConfigType):
             yield proto_sub_config
         else:
-            raise NotImplementedError(type(proto_sub_config))
+            raise NotImplementedError(type(proto_sub_config))  # pragma: no cover
 
     def resolve_sub_config(self, sub_config: SubConfigType) -> Iterable[StepInputBase]:
         proto_input_type = self.proto_input_type

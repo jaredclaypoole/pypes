@@ -11,10 +11,10 @@ class CacheKeyBase:
 
 class CacheBase:
     def __contains__(self, key: CacheKeyBase) -> bool:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def __getitem__(self, key: CacheKeyBase) -> ValueType:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def __setitem__(self, key: CacheKeyBase, value: ValueType) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover

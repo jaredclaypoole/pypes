@@ -3,7 +3,7 @@ from ..base import ArtifactRequestBase, ArtifactResponseBase, ArtifactResolverBa
 
 class ArtifactSelfRequestBase(ArtifactRequestBase):
     def init_cache(self, resolver: ArtifactResolverBase) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def resolve(self, resolver: ArtifactResolverBase) -> ArtifactResponseBase:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover

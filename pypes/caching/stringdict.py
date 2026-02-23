@@ -12,10 +12,10 @@ class CachedStringDictBase(CacheBase):
         self._init_cache(assert_exists=assert_exists)
 
     def _init_cache(self, assert_exists: bool) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def _update_cache(self, key: HashType, value: str) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def __setitem__(self, key: HashType, value: str) -> None:
         self._update_cache(key, value)

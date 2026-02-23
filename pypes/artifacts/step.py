@@ -32,7 +32,7 @@ class PipelineStepWithArtifacts(PipelineStepBase):
 
     def gen_input_to_output(self, input: StepInputBase, **deps: DepsType) \
             -> Generator[ArtifactRequestBase, ArtifactResponseBase, StepOutputBase]:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
         gen = self.gen_input_to_output(input=input, **deps)

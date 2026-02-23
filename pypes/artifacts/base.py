@@ -5,7 +5,7 @@ from .caching import ArtifactCacheKey, ArtifactCache
 class ArtifactRequestBase:
     @property
     def cache_key(self) -> ArtifactCacheKey:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
 
 class ArtifactResponseBase:
@@ -27,4 +27,4 @@ class ArtifactResolverBase:
         self.step = step
 
     def resolve_request(self, request: ArtifactRequestBase) -> ArtifactResponseBase:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover

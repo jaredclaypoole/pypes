@@ -35,3 +35,6 @@ source = ["pypes"]
 
 [tool.coverage.report]
 include_namespace_packages = true
+exclude_also = [
+    "#\\s*TODO:\\s*cover",
+]

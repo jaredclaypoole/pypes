@@ -54,15 +54,11 @@ class PipelineStepBase(PipelineStepInterface):
         yield from self._deps_resolver.resolve_deps(self.deps_spec, self.pipeline.results)
 
     def unpack_deps(self, full_deps_dict: FullDepsDict) -> dict[str, DepsType]:
-        deps_dict = {
-            name: full_step_output.output
-            for name, full_step_output in full_deps_dict.items()
-        }
-        return deps_dict
+        return full_deps_dict.to_simple_dict()
 
     def full_config_to_inputs(self, full_config: ConfigType) -> Iterable[StepInputBase]:
         for sub_config in self._config_resolver.get_sub_configs(full_config):
             yield from self._config_resolver.resolve_sub_config(sub_config)
 
     def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover

@@ -39,7 +39,7 @@ class PipelineBase(PipelineInterface):
 
     def save_results(self, dill_path: Path|None = None) -> None:
         if dill_path is None:
-            dill_path = Path("./data/dill/all_results.dill")
+            dill_path = Path("./data/dill/all_results.dill")  # pragma: no cover
         with open(dill_path, 'wb') as fdill:
             dill.dump(self._results, fdill)
 
@@ -54,9 +54,6 @@ class PipelineBase(PipelineInterface):
         step.set_pipeline(self)
         self._steps[step_name] = step
 
-    def get_instances(self, step_name: str) -> Iterable[FullStepOutput]:
-        return self._results[step_name]
-
     def _execute_step(self, step_name: str, full_config: ConfigType) -> None:
         step = self._steps[step_name]
         assert step_name not in self._results
@@ -64,7 +61,7 @@ class PipelineBase(PipelineInterface):
         with tqdm(desc=f"{step_name} ") as pbar:
             for input in step.full_config_to_inputs(full_config):
                 for full_deps_dict in step.resolve_deps():
-                    deps_dict = full_deps_dict.to_simple_dict()
+                    deps_dict = step.unpack_deps(full_deps_dict)
                     assert not "input" in deps_dict
                     step_output = step.input_to_output(input=input, **deps_dict)
                     full_step_output = FullStepOutput(

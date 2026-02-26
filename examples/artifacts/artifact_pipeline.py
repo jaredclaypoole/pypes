@@ -83,7 +83,7 @@ class SummOutput(SummInput):
 )
 class SummStep:
     def gen_input_to_output(self, input: SummInput, doc: DocOutput, **kwargs) \
-            -> Generator[ArtifactRequestBase, ArtifactResponseBase, SummOutput]:
+            -> Generator[FakeLLMArtifactSelfRequest, FakeLLMArtifactResponse, SummOutput]:
 
         match input.prompt_version:
             case "v001-basic":

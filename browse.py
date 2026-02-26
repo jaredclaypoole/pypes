@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
@@ -15,6 +16,16 @@ from pypes.core.mytyping import (
 )
 
 
+default_results_path = "./data/dill/all_results.dill"
+RESULTS_PATH = Path(os.getenv("PYPES_RESULTS_PATH", default_results_path))
+
+if not RESULTS_PATH.exists():
+    raise FileNotFoundError(
+        f"Results file not found at {RESULTS_PATH}. "
+        "Set PYPES_RESULTS_PATH to point to a saved results file."
+    )
+
+
 from examples.main.pydantic_pipeline import(
     get_fields_dict as get_pydantic_fields_dict,
 )
@@ -24,6 +35,7 @@ from examples.main.dict_config_pipeline import(
 )
 
 StepOutput = BaseModel
+
 
 
 def get_fields_dict(model: Any) -> dict[str, Any]:
@@ -441,7 +453,7 @@ class ResultsViewer(ft.Container):
 
 def main(page: ft.Page):
     print("Building")
-    fpath_dill = Path("./data/dill/all_results.dill")
+    fpath_dill = RESULTS_PATH
     with fpath_dill.open('rb') as fdill:
         results_dict: dict[str, list[FullStepOutput]] = dill.load(fdill)
 

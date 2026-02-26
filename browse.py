@@ -8,6 +8,7 @@ import pandas as pd
 import flet as ft
 
 from pydantic import BaseModel
+from omegaconf import DictConfig
 
 from pypes.core.mytyping import (
     FullStepOutput, StepOutputBase, FullDepsDict,
@@ -15,11 +16,21 @@ from pypes.core.mytyping import (
 
 
 from examples.main.pydantic_pipeline import(
-    StepInput,
-    get_fields_dict,
+    get_fields_dict as get_pydantic_fields_dict,
+)
+
+from examples.main.dict_config_pipeline import(
+    get_fields_dict as get_dict_config_fields_dict,
 )
 
 StepOutput = BaseModel
+
+
+def get_fields_dict(model: Any) -> dict[str, Any]:
+    if isinstance(model, BaseModel):
+        return get_pydantic_fields_dict(model)
+    elif isinstance(model, DictConfig):
+        return get_dict_config_fields_dict(model)
 
 
 class Filler:

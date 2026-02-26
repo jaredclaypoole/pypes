@@ -330,6 +330,23 @@ Further calls with the same parameters (including trial index) will
 read from the cache instead of calling the fake LLM.
 
 
+## Browsing saved results
+
+`pypes` includes a simple Flet-based browser for inspecting saved pipeline results.
+
+After running a pipeline and saving results:
+
+```python
+pipeline.save_results(dill_path=Path("./data/dill/all_results.dill"))
+```
+
+Launch the browser with:
+
+```
+flet run browse.py
+```
+
+
 ## Why not Airflow / Prefect / Dagster?
 
 `pypes` is intentionally lightweight and code-first.

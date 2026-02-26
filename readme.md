@@ -21,7 +21,7 @@ Conceptually, a `pypes` pipeline is:
 * Artifact-producing steps cache their results based on deterministic hashes of explicit artifact requests
 
 If you've ever hand-wired experiment pipelines, research workflows, or data processing chains,
-pypes removes most of the boilerplate while keeping everything explicit.
+`pypes` removes most of the boilerplate while keeping everything explicit.
 
 
 ## Design Philosophy

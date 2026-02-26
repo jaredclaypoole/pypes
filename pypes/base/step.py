@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Any, Callable, TypeVar
 
 from ..core.mytyping import (
     DepsType,
@@ -11,6 +11,11 @@ from ..core.mytyping import (
 from ..core.interface import PipelineStepInterface
 from ..resolvers.deps import DepsResolver
 from ..resolvers.config import ConfigResolver
+from ..utils.autosubclass import auto_subclass
+from ..utils.read_type_hints import get_first_param_and_return_type
+
+
+C = TypeVar("C", bound=type[Any])
 
 
 class PipelineStepBase(PipelineStepInterface):
@@ -64,3 +69,32 @@ class PipelineStepBase(PipelineStepInterface):
 
     def input_to_output(self, input: StepInputBase, **deps: DepsType) -> StepOutputBase:
         raise NotImplementedError()  # pragma: no cover
+
+    @classmethod
+    def auto_step(
+        cls,
+        step_name: str,
+        substep_name: str = "base",
+        *,
+        deps_spec: list[str]|str|None = None,
+        proto_input_type: type[StepInputBase]|None = None,
+        **kwargs_for_init,
+    ) -> Callable[[C], C]:
+
+        def fkwargs(other_class: C) -> dict[str, Any]:
+            input_to_output_method = getattr(other_class, "input_to_output", None)
+            if input_to_output_method is None:
+                raise ValueError(f"Expected decorated class to have an `input_to_output` method")
+            input_type, output_type = get_first_param_and_return_type(input_to_output_method)
+            return dict(input_type=input_type, output_type=output_type)
+
+        auto_suclass_deco = auto_subclass(
+            cls,
+            fkwargs=fkwargs,
+            step_name=step_name,
+            substep_name=substep_name,
+            deps_spec=deps_spec,
+            proto_input_type=proto_input_type,
+            **kwargs_for_init,
+        )
+        return auto_suclass_deco

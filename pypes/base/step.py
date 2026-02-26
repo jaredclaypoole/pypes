@@ -22,6 +22,8 @@ class PipelineStepBase(PipelineStepInterface):
         proto_input_type: type[StepInputBase]|None = None,
         input_type: type[StepInputBase] = StepInputBase,
         output_type: type[StepOutputBase] = StepOutputBase,
+        deps_resolver: DepsResolver|None = None,
+        config_resolver: ConfigResolver|None = None,
     ):
         super().__init__()
         self._step_name = step_name
@@ -31,8 +33,8 @@ class PipelineStepBase(PipelineStepInterface):
         self.input_type = input_type
         self.output_type = output_type
 
-        self._deps_resolver = DepsResolver()
-        self._config_resolver = ConfigResolver.from_step(self)
+        self._deps_resolver = deps_resolver or DepsResolver()
+        self._config_resolver = config_resolver or ConfigResolver.from_step(self)
 
     @property
     def step_name(self) -> str:

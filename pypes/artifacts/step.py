@@ -14,14 +14,19 @@ class PipelineStepWithArtifacts(PipelineStepBase):
     def __init__(
         self,
         step_name: str,
-        deps_spec: list[str]|str|None,
-        artifact_resolver: ArtifactResolverBase,
+        substep_name: str = "base",
+        deps_spec: list[str]|str|None = None,
+        artifact_resolver: ArtifactResolverBase | None = None,
         proto_input_type: type[StepInputBase]|None = None,
         input_type: type[StepInputBase] = StepInputBase,
         output_type: type[StepOutputBase] = StepOutputBase,
     ):
+        if artifact_resolver is None:
+            raise ValueError("A non-None artifact_resolver must be passed explicitly")
+
         super().__init__(
             step_name=step_name,
+            substep_name=substep_name,
             deps_spec=deps_spec,
             proto_input_type=proto_input_type,
             input_type=input_type,

@@ -192,3 +192,35 @@ def test_artifact_pipeline():
                 cache_hit=True,
             ),
         ]
+
+def test_no_resolver():
+    class DummyTranslatedDocStep(PipelineStepWithArtifacts):
+        def __init__(self):
+            super().__init__(
+                step_name="translated_doc",
+                deps_spec="doc",
+                input_type=TranslatedDocInput,
+                output_type=TranslatedDocOutput,
+            )
+
+        def gen_input_to_output(self, input: TranslatedDocInput, doc: DocOutput, **kwargs) \
+                -> Generator[DummyStrDictArtifactSelfRequest, DummyStrDictArtifactResponse, TranslatedDocOutput]:
+            new_text = f"[language={input.language}] {doc.text}"
+
+            request = DummyStrDictArtifactSelfRequest(
+                content=new_text,
+                cache_heading="dummy",
+            )
+
+            response = yield request
+
+            new_text_from_artifact = response.content
+            output = TranslatedDocOutput(
+                **get_fields_dict(input),
+                text=new_text_from_artifact,
+                cache_hit=response.cache_hit,
+            )
+            return output
+
+    with pytest.raises(ValueError):
+        DummyTranslatedDocStep()

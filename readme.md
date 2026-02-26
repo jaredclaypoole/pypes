@@ -9,6 +9,7 @@ It's designed for workflows where:
 * You want reproducibility and structured execution
 * You want clean, typed interfaces between steps
 * You want Hydra-driven configuration without writing orchestration glue
+* You need deterministic artifact caching for expensive or external computations
 
 Conceptually, a `pypes` pipeline is:
 
@@ -16,7 +17,8 @@ Conceptually, a `pypes` pipeline is:
 * Each step defines how to transform its inputs into outputs
 * Config defines the cartesian expansion of inputs at each step
 * Dependencies automatically propagate and expand
-* Steps are executed in order, and each expanded inputis processed independently
+* Steps are executed in order, and each expanded input is processed independently
+* Artifact-producing steps cache their results based on deterministic hashes of explicit artifact requests
 
 If you've ever hand-wired experiment pipelines, research workflows, or data processing chains,
 pypes removes most of the boilerplate while keeping everything explicit.
@@ -24,11 +26,12 @@ pypes removes most of the boilerplate while keeping everything explicit.
 
 ## Design Philosophy
 
-- Explicit dependencies over implicit wiring
-- Typed boundaries between steps
-- Config-driven expansion
-- Minimal magic
-- Easy to debug
+* Explicit dependencies over implicit wiring
+* Typed boundaries between steps
+* Config-driven expansion
+* Deterministic artifact resolution and caching
+* Minimal magic
+* Easy to debug
 
 
 ## Introduction by example
@@ -57,7 +60,7 @@ class TruncatedDocStep:
         )
 ```
 
-In the example above, we define a step nameed `truncated_doc` which depends on step `doc`
+In the example above, we define a step named `truncated_doc` which depends on step `doc`
 (and, implicitly, on any of `doc`'s dependencies).
 
 We override the `input_to_output` method of `PipelineStepBase`, annotating it with appropriate type hints.
@@ -103,7 +106,7 @@ class DocStep:
         )
 ```
 
-We see this class overrides an additonal method of `PipelineStepBase`, `full_config_to_inputs`.
+We see this class overrides an additional method of `PipelineStepBase`, `full_config_to_inputs`.
 Rather than taking the inputs directly from (preprocessed) Hydra config,
 this pipeline step performs a post-processing step in between.
 This allows `DocStep` to read a `proto_input.dir_path`, read the corresponding directory's contents,
@@ -136,7 +139,7 @@ There are two exceptions:
   * If you intend to pass an actual list to a single `input`, you'll have to "escape" it inside an extra list.
 
 In this example, `doc` will create one (proto-)input,
-`truncated_doc` wil create four,
+`truncated_doc` will create four,
 and `translated_doc` will create two.
 (Recall that `doc` actually splits its proto-inputs further,
 creating one input for each glob-matching file present in the `dir_path` directory.)
@@ -245,6 +248,86 @@ In most pipeline steps, the `proto_input_type` is automatically inferred to be t
 `get_fields_dict` is a utility function to obtain a dict of the field name-value pairs in a Pydantic model.
 
 Just about everything else about this example is the same as for the `DictConfig` example.
+
+
+## Caching artifacts
+
+Another major feature of `pypes` is the ability to save and load artifacts.
+Here is a demonstration pipeline of the form:
+
+```
+doc  →  summ
+```
+
+We'll examine the `summ` step, as the `doc` step is the same as above.
+The following step uses a "FakeLLM" to pretend to summarize text.
+The workflow would be the same with a real LLM.
+
+
+```python
+from pypes.artifacts.self.serial import ArtifactSerialSelfResolver
+from pypes.artifacts.self.fakellm import FakeLLMArtifactSelfRequest, FakeLLMArtifactResponse
+
+
+class SummInput(StepInput):
+    nwords: int
+    model: str
+    prompt_version: str
+
+
+class SummOutput(SummInput):
+    summ: str
+
+
+@PipelineStepWithArtifacts.auto_step(
+    "summ",
+    deps_spec="doc",
+    artifact_resolver=ArtifactSerialSelfResolver(),
+)
+class SummStep:
+    def gen_input_to_output(self, input: SummInput, doc: DocOutput, **kwargs) \
+            -> Generator[FakeLLMArtifactSelfRequest, FakeLLMArtifactResponse, SummOutput]:
+
+        match input.prompt_version:
+            case "v001-basic":
+                prompt_template_str = f"""
+Summarize the following document in at most $nwords words.
+Your response should consist only of the summary, not any commentary.
+Do not exceed $nwords words.
+
+Document:
+$doc
+
+Summary:
+""".strip()
+            case _:
+                raise NotImplementedError()
+
+        prompt_kwargs = dict(
+            doc=doc.text,
+            nwords=f"{input.nwords}",
+        )
+        request = FakeLLMArtifactSelfRequest(
+            input=input,
+            model=input.model,
+            prompt_template_str=prompt_template_str,
+            prompt_kwargs=prompt_kwargs,
+            cache_heading="default",
+        )
+
+        response = yield request
+        assert isinstance(response, FakeLLMArtifactResponse)
+        summ_text = response.text
+        output = SummOutput(
+            **get_fields_dict(input),
+            summ=summ_text,
+        )
+        return output
+```
+
+Here the artifact request gets cached according to a hash of the request object.
+Further calls with the same parameters (including trial index) will
+read from the cache instead of calling the fake LLM.
 
 
 ## Why not Airflow / Prefect / Dagster?

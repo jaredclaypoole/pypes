@@ -43,8 +43,16 @@ class DocInput(DocProtoInput):
 class DocOutput(DocInput):
     text: str
 
-@PipelineStepBase.auto_step("doc", proto_input_type=DocProtoInput)
-class DocStep:
+class DocStep(PipelineStepBase):
+    def __init__(self):
+        super().__init__(
+            step_name="doc",
+            deps_spec=None,
+            proto_input_type=DocProtoInput,
+            input_type=DocInput,
+            output_type=DocOutput,
+        )
+
     def full_config_to_inputs(self, full_config: ConfigType) -> Iterable[DocInput]:
         for proto_input in super().full_config_to_inputs(full_config):
             assert isinstance(proto_input, DocProtoInput)
@@ -76,12 +84,16 @@ class SummOutput(SummInput):
     summ: str
 
 
-@PipelineStepWithArtifacts.auto_step(
-    "summ",
-    deps_spec="doc",
-    artifact_resolver=ArtifactSerialSelfResolver(),
-)
-class SummStep:
+class SummStep(PipelineStepWithArtifacts):
+    def __init__(self):
+        super().__init__(
+            step_name="summ",
+            deps_spec="doc",
+            artifact_resolver=ArtifactSerialSelfResolver(),
+            input_type=SummInput,
+            output_type=SummOutput,
+        )
+
     def gen_input_to_output(self, input: SummInput, doc: DocOutput, **kwargs) \
             -> Generator[ArtifactRequestBase, ArtifactResponseBase, SummOutput]:
 

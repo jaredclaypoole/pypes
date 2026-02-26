@@ -38,8 +38,16 @@ class DocInput(DocProtoInput):
 class DocOutput(DocInput):
     text: str
 
-@PipelineStepBase.auto_step("doc", proto_input_type=DocProtoInput)
-class DocStep:
+class DocStep(PipelineStepBase):
+    def __init__(self):
+        super().__init__(
+            step_name="doc",
+            deps_spec=None,
+            proto_input_type=DocProtoInput,
+            input_type=DocInput,
+            output_type=DocOutput,
+        )
+
     def full_config_to_inputs(self, full_config: ConfigType) -> Iterable[DocInput]:
         for proto_input in super().full_config_to_inputs(full_config):
             assert isinstance(proto_input, DocProtoInput)
@@ -67,8 +75,15 @@ class TruncatedDocInput(StepInput):
 class TruncatedDocOutput(TruncatedDocInput):
     text: str
 
-@PipelineStepBase.auto_step("truncated_doc", deps_spec="doc")
-class TruncatedDocStep:
+class TruncatedDocStep(PipelineStepBase):
+    def __init__(self):
+        super().__init__(
+            step_name="truncated_doc",
+            deps_spec="doc",
+            input_type=TruncatedDocInput,
+            output_type=TruncatedDocOutput,
+        )
+
     def input_to_output(self, input: TruncatedDocInput, doc: DocOutput, **kwargs) -> TruncatedDocOutput:
         sentences = doc.text.split(".")[:input.nsentences]
         sentences = [s.strip() for s in sentences] + [""]
@@ -86,8 +101,15 @@ class TranslatedDocInput(StepInput):
 class TranslatedDocOutput(TranslatedDocInput):
     text: str
 
-@PipelineStepBase.auto_step("translated_doc", deps_spec="truncated_doc")
-class TranslatedDocStep:
+class TranslatedDocStep(PipelineStepBase):
+    def __init__(self):
+        super().__init__(
+            step_name="translated_doc",
+            deps_spec="truncated_doc",
+            input_type=TranslatedDocInput,
+            output_type=TranslatedDocOutput,
+        )
+
     def input_to_output(self, input: TranslatedDocInput, truncated_doc: TruncatedDocOutput, **kwargs) -> TranslatedDocOutput:
         new_text = f"[language={input.language}] {truncated_doc.text}"
         output = TranslatedDocOutput(

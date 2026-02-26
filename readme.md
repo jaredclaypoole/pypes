@@ -1,15 +1,48 @@
 # pypes
 
-A Python pipelining framework.
+`pypes` is a lightweight, dependency-aware pipeline framework for Python.
 
-pypes lets you define pipelines where each step can have multiple dependencies,
-and you can easily access attributes of any output in a given step's dependency tree.
+It's designed for workflows where:
+
+* Steps depend on the outputs of previous steps, even several steps back in the dependency tree
+* Each step may fan out into multiple inputs (e.g. via config lists or trial counts)
+* You want reproducibility and structured execution
+* You want clean, typed interfaces between steps
+* You want Hydra-driven configuration without writing orchestration glue
+
+Conceptually, a `pypes` pipeline is:
+
+* A DAG of named steps
+* Each step defines how to transform its inputs into outputs
+* Config defines the cartesian expansion of inputs at each step
+* Dependencies automatically propagate and expand
+* Steps are executed in order, and each expanded inputis processed independently
+
+If you've ever hand-wired experiment pipelines, research workflows, or data processing chains,
+pypes removes most of the boilerplate while keeping everything explicit.
+
+
+## Design Philosophy
+
+- Explicit dependencies over implicit wiring
+- Typed boundaries between steps
+- Config-driven expansion
+- Minimal magic
+- Easy to debug
 
 
 ## Introduction by example
 
-Here's a simple example of a pipeline step, taken from `examples/main/dict_config_pipeline.py`:
+Let's start with a simple pipeline,
+taken from `examples/main/dict_config_pipeline.py`.
 
+```
+doc  →  truncated_doc  →  translated_doc
+```
+
+
+The simplest place to start is the second step.
+(There are some subtleties associated with the first step that we'll visit below.)
 
 ```python
 @PipelineStepBase.auto_step("truncated_doc", deps_spec="doc")
@@ -211,4 +244,15 @@ It is slightly more verbose, but the additional checks performed by Pydantic are
 In most pipeline steps, the `proto_input_type` is automatically inferred to be the same as the input type.)
 `get_fields_dict` is a utility function to obtain a dict of the field name-value pairs in a Pydantic model.
 
-Everything else about this example is the same as for the `DictConfig` example.
+Just about everything else about this example is the same as for the `DictConfig` example.
+
+
+## Why not Airflow / Prefect / Dagster?
+
+`pypes` is intentionally lightweight and code-first.
+It targets research workflows and local experimentation rather than distributed production scheduling.
+
+* No scheduler
+* No external services
+* Pure Python
+* Hydra-native configuration

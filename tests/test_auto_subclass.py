@@ -54,7 +54,7 @@ def test_auto_subclass_complex():
         BaseClass,
         base_class_str="This is the base class str",
         sub_class_str="This is the sub class str",
-        other_base_class_str="This is the other base class str",
+        fkwargs=lambda cls: dict(other_base_class_str="This is the other base class str"),
     )
     class SubClass(OtherBaseClass):
         def __init__(self, sub_class_str: str, other_base_class_str: str, **kwargs):

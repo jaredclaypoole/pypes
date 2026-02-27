@@ -23,7 +23,7 @@ class Pipeline(PipelineBase):
     pass
 
 
-pipeline = Pipeline()
+pipeline = Pipeline(name=Path(__file__).stem)
 
 
 @PipelineStepBase.auto_step("doc")

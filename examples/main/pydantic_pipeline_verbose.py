@@ -20,7 +20,7 @@ class Pipeline(PipelineBase):
     pass
 
 
-pipeline = Pipeline()
+pipeline = Pipeline(name=Path(__file__).stem)
 
 
 class StepInput(BaseModel, frozen=True):

@@ -14,7 +14,9 @@ from ..core.mytyping import (
 
 
 class PipelineBase(PipelineInterface):
-    def __init__(self):
+    def __init__(self, name: str = "default_pipeline"):
+        super().__init__()
+        self.name = name
         self._steps: dict[str, PipelineStepInterface] = {}
         self._results: ResultsSpec = {}
         self._cache_base_dir: Path|None = None
@@ -29,17 +31,19 @@ class PipelineBase(PipelineInterface):
 
     def process_config(self, full_config: ConfigType) -> None:
         sub_config: SubConfigType = full_config.get("pipeline", SubConfigType({}))
-        if cache_base_dir := sub_config.get("cache_base_dir"):
-            self._cache_base_dir = Path(cache_base_dir)
+        cache_base_dir = sub_config.get("cache_base_dir", f"./data/pipelines/{self.name}/results")
+        self._cache_base_dir = Path(cache_base_dir)
 
     def run(self, config: ConfigType) -> None:
         self.process_config(config)
         for step_name in self._steps.keys():
             self._execute_step(step_name, full_config=config)
 
-    def save_results(self, dill_path: Path|None = None) -> None:
+    def save_results(self, dill_path: Path|None = None, mkdir: bool = True) -> None:
         if dill_path is None:
-            dill_path = Path("./data/dill/all_results.dill")  # pragma: no cover
+            dill_path = Path(f"./data/pipelines/{self.name}/dill/all_results.dill")  # pragma: no cover
+        if mkdir:
+            dill_path.parent.mkdir(exist_ok=True, parents=True)
         with open(dill_path, 'wb') as fdill:
             dill.dump(self._results, fdill)
 

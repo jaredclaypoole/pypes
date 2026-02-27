@@ -18,7 +18,7 @@ def main(config: DictConfig) -> None:
     print()
 
     pipeline.run(config)
-    dill_path = Path("./data/dill/all_results.dill")
+    dill_path = Path(f"./data/dill/pipelines/{pipeline.name}/all_results.dill")
     pipeline.save_results(dill_path=dill_path)
     print(f"Results saved to {dill_path}")
 

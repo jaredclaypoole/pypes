@@ -1,3 +1,6 @@
+![CI](https://github.com/jaredclaypoole/pypes/actions/workflows/ci.yml/badge.svg)
+[![codecov](https://codecov.io/gh/jaredclaypoole/pypes/branch/main/graph/badge.svg)](https://codecov.io/gh/jaredclaypoole/pypes)
+
 # pypes
 
 `pypes` is a lightweight, dependency-aware pipeline framework for Python.

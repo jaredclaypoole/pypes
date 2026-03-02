@@ -15,14 +15,16 @@ from pypes.core.mytyping import (
     FullStepOutput, StepOutputBase, FullDepsDict,
 )
 
+from flet_utils import SandboxedFilePicker, PickResult
 
-default_results_path = "./data/dill/all_results.dill"
-RESULTS_PATH = Path(os.getenv("PYPES_RESULTS_PATH", default_results_path))
 
-if not RESULTS_PATH.exists():
+default_results_dir = "./data"
+RESULTS_DIR_PATH = Path(os.getenv("PYPES_RESULTS_DIR", default_results_dir))
+
+if not RESULTS_DIR_PATH.exists():
     raise FileNotFoundError(
-        f"Results file not found at {RESULTS_PATH}. "
-        "Set PYPES_RESULTS_PATH to point to a saved results file."
+        f"Results dir not found at {RESULTS_DIR_PATH}. "
+        "Set PYPES_RESULTS_DIR to point to a parent directory of saved results."
     )
 
 
@@ -451,14 +453,122 @@ class ResultsViewer(ft.Container):
         self.fso_browser.set_show_only_selected(value)
 
 
+class MyTabs(ft.Tabs):
+    def __init__(
+        self,
+        tabs: list[ft.Tab],
+        tab_controls: list[ft.Tab],
+        selected_index: int = 0,
+        expand=1,
+        **kwargs,
+    ):
+        if len(tabs) != len(tab_controls):
+            raise ValueError(f"There must be exactly as many tabs as tab_controls")
+
+        self.tab_bar = ft.TabBar(
+            tabs=list(tabs),
+        )
+        self.tab_bar_view = ft.TabBarView(
+            controls=list(tab_controls),
+            expand=1,
+        )
+        col = ft.Column(
+            [
+                self.tab_bar,
+                self.tab_bar_view,
+            ],
+            expand=1,
+        )
+
+        super().__init__(
+            content=col,
+            length=len(tabs),
+            selected_index=selected_index,
+            expand=expand,
+            **kwargs,
+        )
+
+    def add_tab(self, tab: ft.Tab, content: ft.Control, index: int|None = None) -> None:
+        if index is None:
+            index = self.length
+        self.tab_bar.tabs.insert(index, tab)
+        self.tab_bar_view.controls.insert(index, content)
+        self.length += 1
+
+    def remove_tab(self, index: int|None = None) -> None:
+        if index is None:
+            index = self.length - 1
+        self.tab_bar.tabs.pop(index)
+        self.tab_bar_view.controls.pop(index)
+        self.length -= 1
+
+
+class ResultsBrowser(ft.Container):
+    def __init__(self, page: ft.Page, root_dir: str|Path, expand=1):
+        super().__init__(expand=expand)
+        self.the_page = page
+
+        self._has_results_view_tab = False
+
+        self.root_dir = Path(root_dir)
+        subdir_path = self.root_dir / "pipelines"
+        subdir = subdir_path.name if subdir_path.exists() else None
+
+        self.file_picker = SandboxedFilePicker(
+            root_dir=self.root_dir,
+            start_subdir=subdir,
+            allow_files=True,
+            allow_dirs=False,
+            file_exts={".dill"},
+            on_pick=self.handle_file_pick,
+        )
+        self.picker_results_Text = ft.Text("Results file not yet chosen")
+
+        choose_results_tab_control = ft.Column(
+            [
+                self.file_picker.view,
+                ft.Divider(),
+                self.picker_results_Text,
+            ],
+            expand=1,
+        )
+
+        self.mytabs = MyTabs(
+            tabs=[
+                ft.Tab(label="Choose results"),
+            ],
+            tab_controls=[
+                choose_results_tab_control,
+            ],
+        )
+        self.content = self.mytabs
+
+    def handle_file_pick(self, pick_result: PickResult) -> None:
+        self.results_fpath = pick_result.path
+        rel_path = pick_result.rel_path
+        self.picker_results_Text.value = f"Chosen results file: {rel_path}"
+
+        with self.results_fpath.open('rb') as fdill:
+            results_dict: dict[str, list[FullStepOutput]] = dill.load(fdill)
+        self.results_viewer = ResultsViewer(page=self.the_page, results_dict=results_dict)
+
+        if self._has_results_view_tab:
+            self.mytabs.remove_tab()
+
+        self.mytabs.add_tab(
+            tab=ft.Tab(label="View results"),
+            content=self.results_viewer,
+        )
+        self._has_results_view_tab = True
+        self.the_page.update()
+
+
 def main(page: ft.Page):
     print("Building")
-    fpath_dill = RESULTS_PATH
-    with fpath_dill.open('rb') as fdill:
-        results_dict: dict[str, list[FullStepOutput]] = dill.load(fdill)
 
-    viewer = ResultsViewer(page, results_dict)
-    page.add(viewer)
+    browser = ResultsBrowser(page=page, root_dir=RESULTS_DIR_PATH)
+    page.add(browser)
+
     print("Done")
 
 

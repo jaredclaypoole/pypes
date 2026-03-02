@@ -340,6 +340,14 @@ After running a pipeline and saving results:
 pipeline.save_results(dill_path=Path("./data/dill/all_results.dill"))
 ```
 
+You can also run all the examples with the following.
+By default, each example's results will be saved in
+`./data/pipelines/<example-name>/dill/results.dill`.
+
+```
+python run_examples.py
+```
+
 Launch the browser with:
 
 ```

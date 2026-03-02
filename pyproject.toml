@@ -32,6 +32,9 @@ include = ["pypes*"]
 
 [tool.coverage.run]
 source = ["pypes"]
+omit = [
+    "pypes/frontend/*",
+]
 
 [tool.coverage.report]
 include_namespace_packages = true

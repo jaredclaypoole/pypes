@@ -346,6 +346,12 @@ Launch the browser with:
 flet run browse.py
 ```
 
+You can adjust the path where the browser looks for results by setting
+the env var `PYPES_RESULTS_PATH` before running `flet run browse.py`.
+(Note that this env var is currently used by the browser only,
+not the pipeline runner itself.
+The pipeline's default save location can be changed in config.)
+
 
 ## Why not Airflow / Prefect / Dagster?
 

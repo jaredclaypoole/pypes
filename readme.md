@@ -89,8 +89,8 @@ Let's now take a look at how the dependency, `doc`, was defined.
 ```python
 @PipelineStepBase.auto_step("doc")
 class DocStep:
-    def full_config_to_inputs(self, full_config: DictConfig) -> Iterable[DictConfig]:
-        for proto_input in super().full_config_to_inputs(full_config):
+    def full_config_to_inputs(self, full_config: DictConfig, **kwargs) -> Iterable[DictConfig]:
+        for proto_input in super().full_config_to_inputs(full_config, **kwargs):
             assert isinstance(proto_input, DictConfig)
             dir_path = Path(proto_input.dir_path)
             for fpath in sorted(dir_path.glob(proto_input.glob)):
@@ -222,8 +222,8 @@ class DocOutput(DocInput):
 
 @PipelineStepBase.auto_step("doc", proto_input_type=DocProtoInput)
 class DocStep:
-    def full_config_to_inputs(self, full_config: ConfigType) -> Iterable[DocInput]:
-        for proto_input in super().full_config_to_inputs(full_config):
+    def full_config_to_inputs(self, full_config: ConfigType, **kwargs) -> Iterable[DocInput]:
+        for proto_input in super().full_config_to_inputs(full_config, **kwargs):
             assert isinstance(proto_input, DocProtoInput)
             dir_path = Path(proto_input.dir_path)
             for fpath in sorted(dir_path.glob(proto_input.glob)):

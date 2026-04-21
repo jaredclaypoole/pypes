@@ -63,7 +63,7 @@ class PipelineStepBase(PipelineStepInterface):
     def unpack_deps(self, full_deps_dict: FullDepsDict) -> dict[str, DepsType]:
         return full_deps_dict.to_simple_dict()
 
-    def full_config_to_inputs(self, full_config: ConfigType) -> Iterable[StepInputBase]:
+    def full_config_to_inputs(self, full_config: ConfigType, **deps: DepsType) -> Iterable[StepInputBase]:
         for sub_config in self._config_resolver.get_sub_configs(full_config):
             yield from self._config_resolver.resolve_sub_config(sub_config)
 

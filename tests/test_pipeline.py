@@ -161,13 +161,13 @@ def test_pipeline(pipeline: Pipeline):
         ),
         TruncatedDocOutput(
             trial=0,
-            nsentences=1,
-            text="This is another document.",
+            nsentences=2,
+            text="This is my first document. It is short.",
         ),
         TruncatedDocOutput(
             trial=0,
-            nsentences=2,
-            text="This is my first document. It is short.",
+            nsentences=1,
+            text="This is another document.",
         ),
         TruncatedDocOutput(
             trial=0,
@@ -183,34 +183,64 @@ def test_pipeline(pipeline: Pipeline):
             text="[language=fr] This is my first document.",
         ),
         TranslatedDocOutput(
-            trial=0,
-            language="fr",
-            text="[language=fr] This is another document.",
-        ),
-        TranslatedDocOutput(
-            trial=0,
-            language="fr",
-            text="[language=fr] This is my first document. It is short.",
-        ),
-        TranslatedDocOutput(
-            trial=0,
-            language="fr",
-            text="[language=fr] This is another document. It is slightly longer.",
-        ),
-        TranslatedDocOutput(
             trial=1,
             language="fr",
             text="[language=fr] This is my first document.",
         ),
         TranslatedDocOutput(
+            trial=0,
+            language="de",
+            text="[language=de] This is my first document.",
+        ),
+        TranslatedDocOutput(
             trial=1,
+            language="de",
+            text="[language=de] This is my first document.",
+        ),
+        TranslatedDocOutput(
+            trial=0,
+            language="fr",
+            text="[language=fr] This is my first document. It is short.",
+        ),
+        TranslatedDocOutput(
+            trial=1,
+            language="fr",
+            text="[language=fr] This is my first document. It is short.",
+        ),
+        TranslatedDocOutput(
+            trial=0,
+            language="de",
+            text="[language=de] This is my first document. It is short.",
+        ),
+        TranslatedDocOutput(
+            trial=1,
+            language="de",
+            text="[language=de] This is my first document. It is short.",
+        ),
+        TranslatedDocOutput(
+            trial=0,
             language="fr",
             text="[language=fr] This is another document.",
         ),
         TranslatedDocOutput(
             trial=1,
             language="fr",
-            text="[language=fr] This is my first document. It is short.",
+            text="[language=fr] This is another document.",
+        ),
+        TranslatedDocOutput(
+            trial=0,
+            language="de",
+            text="[language=de] This is another document.",
+        ),
+        TranslatedDocOutput(
+            trial=1,
+            language="de",
+            text="[language=de] This is another document.",
+        ),
+        TranslatedDocOutput(
+            trial=0,
+            language="fr",
+            text="[language=fr] This is another document. It is slightly longer.",
         ),
         TranslatedDocOutput(
             trial=1,
@@ -220,37 +250,7 @@ def test_pipeline(pipeline: Pipeline):
         TranslatedDocOutput(
             trial=0,
             language="de",
-            text="[language=de] This is my first document.",
-        ),
-        TranslatedDocOutput(
-            trial=0,
-            language="de",
-            text="[language=de] This is another document.",
-        ),
-        TranslatedDocOutput(
-            trial=0,
-            language="de",
-            text="[language=de] This is my first document. It is short.",
-        ),
-        TranslatedDocOutput(
-            trial=0,
-            language="de",
             text="[language=de] This is another document. It is slightly longer.",
-        ),
-        TranslatedDocOutput(
-            trial=1,
-            language="de",
-            text="[language=de] This is my first document.",
-        ),
-        TranslatedDocOutput(
-            trial=1,
-            language="de",
-            text="[language=de] This is another document.",
-        ),
-        TranslatedDocOutput(
-            trial=1,
-            language="de",
-            text="[language=de] This is my first document. It is short.",
         ),
         TranslatedDocOutput(
             trial=1,

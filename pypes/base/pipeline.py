@@ -63,10 +63,10 @@ class PipelineBase(PipelineInterface):
         assert step_name not in self._results
         self._results[step_name] = []
         with tqdm(desc=f"{step_name} ") as pbar:
-            for input in step.full_config_to_inputs(full_config):
-                for full_deps_dict in step.resolve_deps():
-                    deps_dict = step.unpack_deps(full_deps_dict)
-                    assert not "input" in deps_dict
+            for full_deps_dict in step.resolve_deps():
+                deps_dict = step.unpack_deps(full_deps_dict)
+                assert not "input" in deps_dict
+                for input in step.full_config_to_inputs(full_config, **deps_dict):
                     step_output = step.input_to_output(input=input, **deps_dict)
                     full_step_output = FullStepOutput(
                         deps=full_deps_dict,

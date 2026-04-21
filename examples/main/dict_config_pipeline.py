@@ -5,10 +5,7 @@ from omegaconf import OmegaConf, DictConfig
 
 from pypes.base.step import PipelineStepBase
 from pypes.base.pipeline import PipelineBase
-
-
-def get_fields_dict(config: DictConfig) -> dict[str, Any]:
-    return OmegaConf.to_container(config)
+from pypes.utils.dictconfig_utils import get_fields_dict
 
 
 def replace(config: DictConfig, **kwargs: Any) -> DictConfig:

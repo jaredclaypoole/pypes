@@ -28,11 +28,11 @@ if not RESULTS_DIR_PATH.exists():
     )
 
 
-from examples.main.pydantic_pipeline import(
+from ..utils.pydantic_utils import(
     get_fields_dict as get_pydantic_fields_dict,
 )
 
-from examples.main.dict_config_pipeline import(
+from ..utils.dictconfig_utils import(
     get_fields_dict as get_dict_config_fields_dict,
 )
 

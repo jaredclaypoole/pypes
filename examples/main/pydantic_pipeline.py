@@ -10,10 +10,7 @@ from pypes.core.mytyping import (
 )
 from pypes.base.step import PipelineStepBase
 from pypes.base.pipeline import PipelineBase
-
-
-def get_fields_dict(model: BaseModel) -> dict[str, Any]:
-    return {name: getattr(model, name) for name in type(model).model_fields}
+from pypes.utils.pydantic_utils import get_fields_dict
 
 
 class Pipeline(PipelineBase):

@@ -51,5 +51,5 @@ class DirCachedJsonDict(CachedJsonDictBase):
                 self._data[fpath.stem] = json.load(fjson)
 
     def _update_cache(self, key: str, value: dict[str, Any]) -> None:
-        with open(self.cache_dir / f"{key}.txt", 'w') as fjson:
+        with open(self.cache_dir / f"{key}.json", 'w') as fjson:
             json.dump(value, fjson, indent=4, ensure_ascii=False)

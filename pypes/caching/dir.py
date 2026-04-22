@@ -23,7 +23,7 @@ class DirCachedStringDict(CachedStringDictBase):
 
         fpaths = sorted(self.cache_dir.glob("*.txt"))
         for fpath in fpaths:
-            self._data[fpath.stem] = fpath.read_text().strip()
+            self._data[fpath.stem] = fpath.read_text(encoding="utf-8").strip()
 
     def _update_cache(self, key: str, value: str) -> None:
         with open(self.cache_dir / f"{key}.txt", 'w', encoding="utf-8") as ftxt:
@@ -47,7 +47,7 @@ class DirCachedJsonDict(CachedJsonDictBase):
 
         fpaths = sorted(self.cache_dir.glob("*.json"))
         for fpath in fpaths:
-            with fpath.open("r") as fjson:
+            with fpath.open("r", encoding="utf-8") as fjson:
                 self._data[fpath.stem] = json.load(fjson)
 
     def _update_cache(self, key: str, value: dict[str, Any]) -> None:

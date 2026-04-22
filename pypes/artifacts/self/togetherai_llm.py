@@ -16,7 +16,7 @@ from ...utils.hashing import myhash
 
 class TogetherLLMArtifactResponse(ArtifactResponseBase, BaseModel, frozen=True):
     request: "TogetherLLMArtifactSelfRequest"
-    response_dict: dict[str, str]
+    response_dict: dict[str, str|None]
 
 
 class TogetherLLMArtifactSelfRequest(ArtifactSelfRequestBase, BaseModel, frozen=True):

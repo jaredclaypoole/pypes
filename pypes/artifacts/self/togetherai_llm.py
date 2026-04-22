@@ -21,6 +21,7 @@ class TogetherLLMArtifactResponse(ArtifactResponseBase, BaseModel, frozen=True):
 
 class TogetherLLMArtifactSelfRequest(ArtifactSelfRequestBase, BaseModel, frozen=True):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    trial: int
     model: str
     system_prompt: str|None = None
     prompt: str

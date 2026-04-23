@@ -156,7 +156,13 @@ class StepCard(ft.Container):
 
         col = ft.Column(
             [
-                ft.Markdown(f"**{field_name}**:  {value}", selectable=True)
+                ft.Row(
+                    [
+                        ft.Markdown(f"**{field_name}**:  ", selectable=True),
+                        ft.Text(f"{value}", selectable=True),
+                    ],
+                    spacing=0,
+                )
                 for field_name, value in get_fields_dict(self.step_output).items()
             ],
             spacing=0,

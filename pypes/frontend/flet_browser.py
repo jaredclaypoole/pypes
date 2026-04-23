@@ -156,7 +156,7 @@ class StepCard(ft.Container):
 
         col = ft.Column(
             [
-                ft.Markdown(f"**{field_name}**:  {value}")
+                ft.Markdown(f"**{field_name}**:  {value}", selectable=True)
                 for field_name, value in get_fields_dict(self.step_output).items()
             ],
             spacing=0,
@@ -219,7 +219,7 @@ class FilteredStepColumn(ft.Container):
         self.steps_container = ft.Container(expand=1)
         col = ft.Column(
             [
-                ft.Markdown(f"## {self.step_name}"),
+                ft.Markdown(f"## {self.step_name}", selectable=True),
                 self.larger_filters_container,
                 self.steps_container,
             ],

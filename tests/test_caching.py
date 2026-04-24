@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from pypes.caching.base import CacheKeyBase
 from pypes.caching.null import NullCache
-from pypes.caching.dir import DirCachedStringDict
+from pypes.caching.dir import DirCachedStringDict, DirCachedJsonDict
 
 import pytest
 
@@ -60,6 +60,62 @@ def test_dir_cached_string_dict():
         assert cache1[key2] == val2
 
         cache2 = DirCachedStringDict(cache_dir=cache_dir, assert_exists=True)
+        assert key1 in cache2
+        assert key2 in cache2
+        assert cache2[key1] == val1
+        assert cache2[key2] == val2
+
+        dict_expected = {
+            key1: val1,
+            key2: val2,
+        }
+        assert list(cache2.items()) == list(dict_expected.items())
+        assert list(cache2.keys()) == list(dict_expected.keys())
+        assert list(cache2.values()) == list(dict_expected.values())
+        assert list(cache2) == list(dict_expected)
+
+
+def test_dir_cached_string_dict():
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        cache_dir = Path(tmpdirname) / "the_cache"
+        with pytest.raises(AssertionError):
+            DirCachedJsonDict(cache_dir=cache_dir, assert_exists=True)
+
+        key1 = "dummy1"
+        key2 = "dummy2"
+        val1 = {
+            "dummy1_json_key1": "dummy1_json_value1",
+            "dummy1_json_key2": "dummy1_json_value2",
+        }
+        val2 = [
+            "dummy2_value_elem1",
+            {
+                "dummy2_elem2_key1": 1,
+                "dummy2_elem2_key2": {"a": 1, "b": 2},
+            },
+            "dummy2_value_elem3",
+        ]
+
+        cache1 = DirCachedJsonDict(cache_dir=cache_dir, assert_exists=False)
+        assert not (cache_dir / f"{key1}.json").exists()
+        assert key1 not in cache1
+        assert key2 not in cache1
+
+        cache1[key1] = val1
+        assert (cache_dir / f"{key1}.json").exists()
+        assert key1 in cache1
+        assert key2 not in cache1
+        assert cache1[key1] == val1
+
+        cache1[key2] = val2
+        assert (cache_dir / f"{key1}.json").exists()
+        assert (cache_dir / f"{key2}.json").exists()
+        assert key1 in cache1
+        assert key2 in cache1
+        assert cache1[key1] == val1
+        assert cache1[key2] == val2
+
+        cache2 = DirCachedJsonDict(cache_dir=cache_dir, assert_exists=True)
         assert key1 in cache2
         assert key2 in cache2
         assert cache2[key1] == val1

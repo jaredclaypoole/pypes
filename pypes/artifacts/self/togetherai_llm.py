@@ -74,20 +74,19 @@ class TogetherLLMArtifactSelfRequest(ArtifactSelfRequestBase, BaseModel, frozen=
                     {"role": "user", "content": self.prompt},
             ]
 
-            together_kwargs = {}
+            client_kwargs = {}
             if self.max_tokens is not None and self.max_tokens > 0:
-                together_kwargs["max_tokens"] = self.max_tokens
+                client_kwargs["max_tokens"] = self.max_tokens
             if self.temperature is not None:
-                together_kwargs["temperature"] = self.temperature
+                client_kwargs["temperature"] = self.temperature
 
-            together_resp = client.chat.completions.create(
+            client_resp = client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
+                **client_kwargs,
             )
 
-            message = together_resp.choices[0].message
+            message = client_resp.choices[0].message
             response_dict = dict(
                 content=message.content,
                 reasoning=message.reasoning

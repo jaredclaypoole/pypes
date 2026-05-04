@@ -60,34 +60,84 @@ class InstructorLLMArtifactSelfRequest(ArtifactSelfRequestBase, BaseModel, froze
         if response_obj is None:
             try:
                 import instructor
+                # from instructor.core.hooks import Hooks as InstructorHooks
             except OSError:
                 raise ValueError(f"Could not import instructor.  Perhaps run `pip install instructor` in your venv?")
 
-            client = instructor.from_provider(
-                model=self.model,
-            )
-            messages = []
-            if self.system_prompt:
+            try:
+                import langfuse
+            except OSError:
+                raise ValueError(f"Could not import langfuse.  Perhaps run `pip install langfuse` in your venv?")
+
+            def make_instructor_client(model: str):
+                def capture_kwargs(**kwargs):
+                    lf_client = langfuse.get_client()
+                    lf_client.update_current_generation(
+                        metadata=dict(
+                            instructor_completion_kwargs=kwargs,
+                            response_json_schema=self.response_model.model_json_schema(),
+                        ),
+                    )
+                # hooks = InstructorHooks()
+                # hooks.on("completion:kwargs", capture_kwargs)
+                # return instructor.from_provider(model=model, hooks=hooks)
+
+                client = instructor.from_provider(model=model)
+                client.on("completion:kwargs", capture_kwargs)
+                return client
+
+            @langfuse.observe()
+            def make_structured_api_call() -> BaseModel:
+                client = make_instructor_client(model=self.model)
+                lf_client = langfuse.get_client()
+
+                messages = []
+                if self.system_prompt:
+                    messages += [
+                        {"role": "system", "content": self.system_prompt},
+                    ]
                 messages += [
-                    {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": self.prompt},
                 ]
-            messages += [
-                    {"role": "user", "content": self.prompt},
-            ]
 
-            client_kwargs = dict(max_retries=self.max_retries)
-            if self.max_tokens is not None and self.max_tokens > 0:
-                client_kwargs["max_tokens"] = self.max_tokens
-            if self.temperature is not None:
-                client_kwargs["temperature"] = self.temperature
+                client_kwargs = dict(max_retries=self.max_retries)
+                if self.max_tokens is not None and self.max_tokens > 0:
+                    client_kwargs["max_tokens"] = self.max_tokens
+                if self.temperature is not None:
+                    client_kwargs["temperature"] = self.temperature
 
-            response_obj = client.create(
-                messages=messages,
-                response_model=self.response_model,
-                **client_kwargs,
-            )
+                lf_client.update_current_generation(
+                    model=self.model,
+                    input=dict(
+                        caller_messages=messages,
+                        response_schema=self.response_model.model_json_schema(),
+                    ),
+                )
 
-            assert response_obj is not None
+                response_obj, raw_completion = client.create_with_completion(
+                    messages=messages,
+                    response_model=self.response_model,
+                    **client_kwargs,
+                )
+
+                langfuse.get_client().update_current_generation(
+                    output=dict(
+                        parsed=response_obj.model_dump(),
+                        raw_completion=(
+                            raw_completion.model_dump()
+                            if hasattr(raw_completion, "model_dump")
+                            else str(raw_completion)
+                        ),
+                    ),
+                    # metadata=dict(
+                    #     schema=self.response_model.model_json_schema(),
+                    # ),
+                )
+
+                assert response_obj is not None
+                return response_obj
+
+            response_obj = make_structured_api_call()
 
             response_dict = response_obj.model_dump()
             cache_dict[request_key] = response_dict

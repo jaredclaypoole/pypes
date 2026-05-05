@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, cast
 
 import dill
 import numpy as np
@@ -316,6 +316,11 @@ class FilteredStepColumn(ft.Container):
         for step_card in self.step_cards:
             step_card.do_update(update=update)
 
+        self.handle_selection_update()
+
+    def handle_selection_update(self, *args) -> None:
+        self.fso_browser.handle_selection_update(self)
+
     def index_to_fso(self, index: int) -> FullStepOutput:
         return self.step_Df.df0.iloc[index]["full_step_output"]
 
@@ -351,6 +356,7 @@ class FullStepOutputBrowser(ft.Container):
         full_step_outputs: list[FullStepOutput],
         step_name: str,
         show_only_selected: bool = False,
+        first_selected_callback: Callable[[FullStepOutput], None]|None = None,
         expand=1,
     ):
         super().__init__(expand=expand)
@@ -358,6 +364,7 @@ class FullStepOutputBrowser(ft.Container):
         self.full_step_outputs = full_step_outputs
         self.step_name = step_name
         self.df = FullStepOutput.list_to_df(full_step_outputs)
+        self.first_selected_callback = first_selected_callback
 
         self.step_Df_by_step_name: dict[str, FilterableDf] = {}
         self.step_col_by_step_name: dict[str, FilteredStepColumn] = {}
@@ -397,17 +404,64 @@ class FullStepOutputBrowser(ft.Container):
         for step_col in self.step_col_by_step_name.values():
             step_col.set_show_only_selected(show_only_selected)
 
+    def handle_selection_update(self, updated_fsc: FilteredStepColumn) -> None:
+        assert isinstance(updated_fsc, FilteredStepColumn)
+        if updated_fsc.step_name != self.step_name:
+            return
+        for i, full_step_output in updated_fsc.step_Df.df["full_step_output"].loc[updated_fsc.selection_mask].items():
+            fso: FullStepOutput = full_step_output
+            if self.first_selected_callback is not None:
+                self.first_selected_callback(fso)
+            break
+        else:
+            raise ValueError(f"Expected at least one selected item")
+
+
+class CustomViewSpec(BaseModel):
+    view_type: type["CustomView"]
+    step_name: str
+
+
+class CustomView(ft.Container):
+    def __init__(
+        self,
+        page: ft.Page,
+        spec: CustomViewSpec,
+        full_step_output: FullStepOutput,
+        expand=1,
+    ):
+        super().__init__(expand=expand)
+        self.the_page = page
+        self.spec = spec
+        self.fso = full_step_output
+
+        row = self.fso.as_row()
+        simple_dict = {label: cast(FullStepOutput, content).output for label, content in row.items()}
+        self.do_build(**simple_dict)
+
+    def do_build(self, **deps) -> None:
+        raise NotImplementedError()
+
+
+class ResultsViewerSpec(BaseModel):
+    show_right_view: bool = False
+    custom_view_specs: list[CustomViewSpec]
+
 
 class ResultsViewer(ft.Container):
     def __init__(
         self,
         page: ft.Page,
         results_dict: dict[str, list[FullStepOutput]],
+        spec: ResultsViewerSpec,
         expand=1,
     ):
         super().__init__(expand=expand)
         self.the_page = page
         self.results_dict = results_dict
+        self.spec = spec
+        self.custom_view_by_step_name = {cvspec.step_name: cvspec for cvspec in spec.custom_view_specs}
+        self._selected_fso: FullStepOutput|None = None
 
         options = [
             ft.DropdownOption(key=name)
@@ -432,13 +486,25 @@ class ResultsViewer(ft.Container):
             ],
         )
         self.view_container = ft.Container(
+            expand=100,
+        )
+        self.right_view_container = ft.Container(
+            content=ft.Placeholder(),
+            expand=100,
+        )
+        self.view_row = ft.Row(
+            [
+                self.view_container,
+                ft.VerticalDivider(),
+                self.right_view_container,
+            ],
             expand=1,
         )
 
         col = ft.Column(
             [
                 dropdown_row,
-                self.view_container,
+                self.view_row if self.spec.show_right_view else self.view_container,
             ],
             expand=1,
         )
@@ -448,11 +514,13 @@ class ResultsViewer(ft.Container):
     def handle_dropdown_change(self, *args, update: bool = True) -> None:
         step_name = self.dropdown.value.strip()
         outputs = self.results_dict[step_name]
+        self._selected_fso = None
         self.fso_browser = FullStepOutputBrowser(
             page=self.the_page,
             full_step_outputs=outputs,
             step_name=step_name,
             show_only_selected=self.toggle_switch.value,
+            first_selected_callback=self.handle_first_selected,
         )
         self.view_container.content = self.fso_browser
 
@@ -462,6 +530,25 @@ class ResultsViewer(ft.Container):
     def handle_toggle_switch(self, *args) -> None:
         value = self.toggle_switch.value
         self.fso_browser.set_show_only_selected(value)
+
+    def handle_first_selected(self, fso: FullStepOutput) -> None:
+        if fso.step_name != self.fso_browser.step_name:
+            return
+        cvspec = self.custom_view_by_step_name.get(fso.step_name, None)
+        if not cvspec:
+            return
+
+        if self._selected_fso is fso:
+            return
+        self._selected_fso = fso
+
+        custom_view = cvspec.view_type(
+            page=self.the_page,
+            spec=cvspec,
+            full_step_output=fso,
+        )
+        self.right_view_container.content = custom_view
+        self.update()
 
 
 class MyTabs(ft.Tabs):
@@ -515,9 +602,10 @@ class MyTabs(ft.Tabs):
 
 
 class ResultsBrowser(ft.Container):
-    def __init__(self, page: ft.Page, root_dir: str|Path, expand=1):
+    def __init__(self, page: ft.Page, root_dir: str|Path, viewer_spec: ResultsViewerSpec, expand=1):
         super().__init__(expand=expand)
         self.the_page = page
+        self.viewer_spec = viewer_spec
 
         self._has_results_view_tab = False
 
@@ -561,7 +649,7 @@ class ResultsBrowser(ft.Container):
 
         with self.results_fpath.open('rb') as fdill:
             results_dict: dict[str, list[FullStepOutput]] = dill.load(fdill)
-        self.results_viewer = ResultsViewer(page=self.the_page, results_dict=results_dict)
+        self.results_viewer = ResultsViewer(page=self.the_page, results_dict=results_dict, spec=self.viewer_spec)
 
         if self._has_results_view_tab:
             self.mytabs.remove_tab()
@@ -574,10 +662,24 @@ class ResultsBrowser(ft.Container):
         self.the_page.update()
 
 
+class MainApp:
+    def __init__(self, rvspec: ResultsViewerSpec):
+        super().__init__()
+        self.rvspec = rvspec
+
+    def __call__(self, page: ft.Page):
+        print("Building")
+
+        browser = ResultsBrowser(page=page, root_dir=RESULTS_DIR_PATH, viewer_spec=self.rvspec)
+        page.add(browser)
+
+        print("Done")
+
+
 def main(page: ft.Page):
-    print("Building")
-
-    browser = ResultsBrowser(page=page, root_dir=RESULTS_DIR_PATH)
-    page.add(browser)
-
-    print("Done")
+    rvspec = ResultsViewerSpec(
+        show_right_view=False,
+        custom_view_specs=[],
+    )
+    main_app = MainApp(rvspec)
+    main_app(page)

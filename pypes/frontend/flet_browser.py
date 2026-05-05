@@ -446,6 +446,7 @@ class CustomView(ft.Container):
 class ResultsViewerSpec(BaseModel):
     show_right_view: bool = False
     custom_view_specs: list[CustomViewSpec]
+    right_view_expand: int = 100
 
 
 class ResultsViewer(ft.Container):
@@ -490,7 +491,7 @@ class ResultsViewer(ft.Container):
         )
         self.right_view_container = ft.Container(
             content=ft.Placeholder(),
-            expand=100,
+            expand=self.spec.right_view_expand,
         )
         self.view_row = ft.Row(
             [
